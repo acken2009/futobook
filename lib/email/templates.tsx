@@ -112,6 +112,91 @@ export function reservationConfirmationEmail(data: ReservationEmailData): {
   };
 }
 
+export interface ReservationNotificationData {
+  ownerName?: string;
+  storeName: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  reservedAt: string;
+  serviceName?: string;
+  partySize: number;
+  notes?: string;
+  dashboardUrl: string;
+}
+
+export function reservationNotificationEmail(data: ReservationNotificationData): {
+  subject: string;
+  html: string;
+} {
+  const date = new Date(data.reservedAt).toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const html = baseTemplate(
+    `
+    <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 8px;">新しい予約が入りました</h2>
+    <p style="color: #6b7280; margin: 0 0 24px;">以下の内容で予約が確定しました。</p>
+
+    <div style="background: #fff7ed; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <p style="font-size: 12px; color: #9a3412; font-weight: 600; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.05em;">予約内容</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">日時</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td>
+        </tr>
+        ${data.serviceName ? `<tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">サービス</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td>
+        </tr>` : ""}
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">人数</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.partySize}名</td>
+        </tr>
+        ${data.notes ? `<tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">備考</td>
+          <td style="font-size: 14px; padding: 4px 0;">${data.notes}</td>
+        </tr>` : ""}
+      </table>
+    </div>
+
+    <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <p style="font-size: 12px; color: #374151; font-weight: 600; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.05em;">お客様情報</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">お名前</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.customerName} 様</td>
+        </tr>
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">メール</td>
+          <td style="font-size: 14px; padding: 4px 0;"><a href="mailto:${data.customerEmail}" style="color: #3B82F6;">${data.customerEmail}</a></td>
+        </tr>
+        ${data.customerPhone ? `<tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">電話</td>
+          <td style="font-size: 14px; padding: 4px 0;"><a href="tel:${data.customerPhone}" style="color: #3B82F6;">${data.customerPhone}</a></td>
+        </tr>` : ""}
+      </table>
+    </div>
+
+    <a href="${data.dashboardUrl}"
+       style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+      ダッシュボードで確認する
+    </a>
+    `,
+    `【新規予約】${data.storeName}`
+  );
+
+  return {
+    subject: `【新規予約】${data.storeName} - ${date} ${data.customerName}様`,
+    html,
+  };
+}
+
 export function subscriptionConfirmationEmail(data: SubscriptionEmailData): {
   subject: string;
   html: string;

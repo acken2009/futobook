@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
-import { reservationConfirmationEmail } from "@/lib/email/templates";
+import { reservationConfirmationEmail, reservationNotificationEmail } from "@/lib/email/templates";
 import { reservationRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { z } from "zod";
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   // 店舗確認
   const { data: store } = await supabaseAdmin
     .from("stores")
-    .select("id, name, slug")
+    .select("id, name, slug, owner_id")
     .eq("id", store_id)
     .eq("status", "active")
     .single();
@@ -134,7 +134,8 @@ export async function POST(request: NextRequest) {
 
   // 無料予約は即メール送信
   if (!isPaid) {
-    const { subject, html } = reservationConfirmationEmail({
+    // ① 顧客への確認メール
+    const { subject: custSubject, html: custHtml } = reservationConfirmationEmail({
       customerName: customer.name,
       storeName: store.name,
       reservedAt: reserved_at,
@@ -144,11 +145,37 @@ export async function POST(request: NextRequest) {
     });
     await sendEmail({
       to: customer.email,
-      subject,
-      html,
+      subject: custSubject,
+      html: custHtml,
       storeId: store_id,
       type: "reservation_confirmation",
     });
+
+    // ② 店舗オーナーへの通知メール
+    if (store.owner_id) {
+      const { data: ownerUser } = await supabaseAdmin.auth.admin.getUserById(store.owner_id);
+      if (ownerUser?.user?.email) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+        const { subject: ownerSubject, html: ownerHtml } = reservationNotificationEmail({
+          storeName: store.name,
+          customerName: customer.name,
+          customerEmail: customer.email,
+          customerPhone: customer.phone,
+          reservedAt: reserved_at,
+          serviceName,
+          partySize: party_size,
+          notes: notes,
+          dashboardUrl: `${appUrl}/dashboard/reservations`,
+        });
+        await sendEmail({
+          to: ownerUser.user.email,
+          subject: ownerSubject,
+          html: ownerHtml,
+          storeId: store_id,
+          type: "reservation_notification",
+        });
+      }
+    }
   }
 
   return Response.json({ reservation }, { status: 201 });
