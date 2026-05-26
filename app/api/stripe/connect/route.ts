@@ -8,7 +8,7 @@ import { apiError } from "@/lib/utils";
  * POST /api/stripe/connect
  * Stripe Connect Express アカウントを作成し、オンボーディングURLを返す
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return apiError("Unauthorized", 401);
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
  * GET /api/stripe/connect
  * Connect アカウントの状態を確認しDBを更新する
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return apiError("Unauthorized", 401);

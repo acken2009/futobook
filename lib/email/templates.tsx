@@ -35,7 +35,7 @@ function baseTemplate(content: string, title: string): string {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f9fafb; margin: 0; padding: 40px 16px;">
   <div style="max-width: 520px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
     <div style="background: #3B82F6; padding: 32px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 20px;">StorePlatform</h1>
+      <h1 style="color: white; margin: 0; font-size: 20px;">Futobook</h1>
     </div>
     <div style="padding: 32px;">
       ${content}

@@ -159,7 +159,7 @@ export async function handlePlatformSubscriptionCreated(
  */
 export async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
-  connectedAccountId: string
+  _connectedAccountId: string
 ): Promise<void> {
   const { metadata } = paymentIntent;
 

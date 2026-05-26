@@ -17,7 +17,7 @@ interface Props {
   storeId: string;
 }
 
-export function PlatformPlanSection({ plans, currentPlanId, storeId }: Props) {
+export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 

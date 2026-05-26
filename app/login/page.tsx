@@ -76,7 +76,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold">ログイン</h1>
-          <p className="text-gray-500 mt-1">StorePlatform</p>
+          <p className="text-gray-500 mt-1">Futobook</p>
         </div>
 
         {error && (

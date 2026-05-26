@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "StorePlatform",
-    template: "%s | StorePlatform",
+    default: "Futobook",
+    template: "%s | Futobook",
   },
   description: "店舗の予約・サブスク・決済を一元管理するプラットフォーム",
 };

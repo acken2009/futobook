@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
 import { subDays, startOfDay, format } from "date-fns";
-import { ja } from "date-fns/locale";
+
 
 export default async function AnalyticsPage() {
   const supabase = await createClient();

@@ -37,7 +37,7 @@ export default async function DashboardLayout({
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <Link href="/" className="text-xl font-bold text-blue-600">
-            StorePlatform
+            Futobook
           </Link>
           {stores && stores.length > 0 && (
             <p className="text-sm text-gray-500 mt-1 truncate">

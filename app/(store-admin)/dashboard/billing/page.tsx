@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ConnectOnboarding } from "./connect-onboarding";
 import { PlatformPlanSection } from "./platform-plan-section";
-import { formatCurrency } from "@/lib/utils";
+
 
 interface Props {
   searchParams: Promise<{ connect?: string }>;

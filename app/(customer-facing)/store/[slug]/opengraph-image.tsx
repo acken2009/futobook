@@ -64,7 +64,7 @@ export default async function Image({
             borderRadius: 8,
           }}
         >
-          StorePlatform
+          Futobook
         </div>
       </div>
     ),

@@ -11,7 +11,7 @@ interface Props {
   canPay: boolean;
 }
 
-export function SubscribeForm({ storeId, slug, plan, primaryColor, canPay }: Props) {
+export function SubscribeForm({ storeId, slug: _slug, plan, primaryColor, canPay }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);

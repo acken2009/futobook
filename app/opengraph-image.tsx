@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "StorePlatform - 店舗の予約・サブスク・決済プラットフォーム";
+export const alt = "Futobook - 店舗の予約・サブスク・決済プラットフォーム";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -30,7 +30,7 @@ export default async function Image() {
             letterSpacing: "-2px",
           }}
         >
-          StorePlatform
+          Futobook
         </div>
         <div
           style={{
