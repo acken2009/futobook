@@ -18,7 +18,7 @@ export default async function Image({
     .single();
 
   const name = store?.name ?? params.slug;
-  const custom = (store?.store_customizations as any[])?.[0];
+  const custom = (store?.store_customizations as any);
   const color = custom?.primary_color ?? "#3B82F6";
   const description = custom?.description ?? "予約・サブスク・決済対応店舗";
 

@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: store.name,
-    description: (store.store_customizations as any)?.[0]?.description ?? "",
+    description: (store.store_customizations as any)?.description ?? "",
   };
 }
 
@@ -44,7 +44,7 @@ export default async function StorePage({ params }: Props) {
 
   if (!store) notFound();
 
-  const custom = (store.store_customizations as any[])?.[0];
+  const custom = (store.store_customizations as any);
   const services = (store.service_items as any[]) ?? [];
   const plans = ((store.store_subscription_plans as any[]) ?? []).filter(
     (p) => p.is_active

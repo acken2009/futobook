@@ -23,7 +23,7 @@ export default async function CustomizationPage() {
       </p>
       <CustomizationForm
         storeId={store.id}
-        customization={store.store_customizations?.[0] ?? null}
+        customization={(Array.isArray(store.store_customizations) ? store.store_customizations[0] : store.store_customizations) ?? null}
       />
     </div>
   );

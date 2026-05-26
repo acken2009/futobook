@@ -25,7 +25,7 @@ export default async function ReservePage({ params }: Props) {
 
   if (!store) notFound();
 
-  const custom = (store.store_customizations as any[])?.[0];
+  const custom = (store.store_customizations as any);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -46,7 +46,7 @@ export default async function ReservePage({ params }: Props) {
         <ReserveForm
           store={store}
           services={(store.service_items as any[]) ?? []}
-          settings={(store.reservation_settings as any[])?.[0] ?? null}
+          settings={(store.reservation_settings as any) ?? null}
           schedules={(store.availability_schedules as any[]) ?? []}
           primaryColor={custom?.primary_color ?? "#3B82F6"}
         />

@@ -19,7 +19,7 @@ export default async function MySubscriptionsPage({ params }: Props) {
 
   if (!store) notFound();
 
-  const custom = (store.store_customizations as any[])?.[0];
+  const custom = (store.store_customizations as any);
   const primaryColor = custom?.primary_color ?? "#3B82F6";
 
   return (

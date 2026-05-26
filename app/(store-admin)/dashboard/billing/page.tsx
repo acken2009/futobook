@@ -37,7 +37,7 @@ export default async function BillingPage({ searchParams }: Props) {
     .eq("is_active", true)
     .order("price");
 
-  const platformSub = (store.store_platform_subscriptions as any[])?.[0];
+  const platformSub = (store.store_platform_subscriptions as any);
   const currentPlan = platformSub?.platform_subscription_plans;
 
   return (

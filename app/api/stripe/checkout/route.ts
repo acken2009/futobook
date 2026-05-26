@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   // プラットフォーム手数料率（プランによって異なる）
   const platformFeePct =
-    (store.platform_subscription_plans as any)?.[0]?.transaction_fee_pct ??
+    (store.platform_subscription_plans as any)?.transaction_fee_pct ??
     0.05;
 
   // ============================================================

@@ -29,7 +29,7 @@ export default async function SubscribePage({ params, searchParams }: Props) {
 
   if (!store) notFound();
 
-  const custom = (store.store_customizations as any[])?.[0];
+  const custom = (store.store_customizations as any);
   const plans = ((store.store_subscription_plans as any[]) ?? []).filter((p) => p.is_active);
   const primaryColor = custom?.primary_color ?? "#3B82F6";
   const selectedPlan = planId ? plans.find((p: any) => p.id === planId) : plans[0];
