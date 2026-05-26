@@ -43,7 +43,7 @@ export function CustomizationForm({ storeId, customization }: Props) {
 
     const { error } = await supabase
       .from("store_customizations")
-      .upsert({ store_id: storeId, ...form });
+      .upsert({ store_id: storeId, ...form }, { onConflict: "store_id" });
 
     if (!error) setSaved(true);
     setSaving(false);
