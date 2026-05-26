@@ -50,13 +50,14 @@ export default async function StorePage({ params }: Props) {
     (p) => p.is_active
   );
   const primaryColor = custom?.primary_color ?? "#3B82F6";
+  const secondaryColor = custom?.secondary_color ?? "#1E40AF";
 
   return (
     <div className="min-h-screen bg-white">
       {/* ヒーローヘッダー */}
       <header
         className="py-16 px-4 text-white text-center"
-        style={{ backgroundColor: primaryColor }}
+        style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
       >
         <h1 className="text-4xl font-bold mb-3">{store.name}</h1>
         {custom?.description && (

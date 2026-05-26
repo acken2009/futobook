@@ -14,7 +14,7 @@ export default async function ReservePage({ params }: Props) {
     .from("stores")
     .select(`
       id, name, slug,
-      store_customizations(primary_color),
+      store_customizations(primary_color, secondary_color),
       service_items(id, name, price, duration_minutes),
       reservation_settings(*),
       availability_schedules(*)
@@ -32,7 +32,7 @@ export default async function ReservePage({ params }: Props) {
       {/* ヘッダー */}
       <header
         className="py-8 px-4 text-white"
-        style={{ backgroundColor: custom?.primary_color ?? "#3B82F6" }}
+        style={{ background: `linear-gradient(135deg, ${custom?.primary_color ?? "#3B82F6"} 0%, ${custom?.secondary_color ?? "#1E40AF"} 100%)` }}
       >
         <div className="max-w-lg mx-auto">
           <a href={`/store/${slug}`} className="text-white/80 hover:text-white text-sm">

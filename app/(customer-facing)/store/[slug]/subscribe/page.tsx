@@ -20,7 +20,7 @@ export default async function SubscribePage({ params, searchParams }: Props) {
     .select(`
       id, name, slug,
       stripe_account_status,
-      store_customizations(primary_color),
+      store_customizations(primary_color, secondary_color),
       store_subscription_plans(id, name, description, price, interval, features, is_active)
     `)
     .eq("slug", slug)
@@ -32,6 +32,7 @@ export default async function SubscribePage({ params, searchParams }: Props) {
   const custom = (store.store_customizations as any);
   const plans = ((store.store_subscription_plans as any[]) ?? []).filter((p) => p.is_active);
   const primaryColor = custom?.primary_color ?? "#3B82F6";
+  const secondaryColor = custom?.secondary_color ?? "#1E40AF";
   const selectedPlan = planId ? plans.find((p: any) => p.id === planId) : plans[0];
   const canPay = store.stripe_account_status === "active";
 
@@ -52,7 +53,7 @@ export default async function SubscribePage({ params, searchParams }: Props) {
     <div className="min-h-screen bg-gray-50">
       <header
         className="py-8 px-4 text-white"
-        style={{ backgroundColor: primaryColor }}
+        style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
       >
         <div className="max-w-lg mx-auto">
           <a href={`/store/${slug}`} className="text-white/80 hover:text-white text-sm">
