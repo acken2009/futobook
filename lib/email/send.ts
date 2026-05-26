@@ -38,13 +38,13 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     console.error(`Failed to send email to ${to}:`, error);
 
     // 失敗ログ記録
-    await supabaseAdmin.from("notification_log").insert({
+    void supabaseAdmin.from("notification_log").insert({
       store_id: storeId ?? null,
       recipient_email: to,
       type,
       subject,
       status: "failed",
       error: String(error),
-    }).catch(() => {}); // ログ記録失敗は無視
+    }); // ログ記録失敗は無視
   }
 }
