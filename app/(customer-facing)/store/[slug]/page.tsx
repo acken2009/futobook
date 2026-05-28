@@ -45,7 +45,7 @@ export default async function StorePage({ params }: Props) {
   if (!store) notFound();
 
   const custom = (store.store_customizations as any);
-  const services = (store.service_items as any[]) ?? [];
+  const services = ((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false);
   const plans = ((store.store_subscription_plans as any[]) ?? []).filter(
     (p) => p.is_active
   );

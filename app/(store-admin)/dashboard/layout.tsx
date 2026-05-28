@@ -24,6 +24,7 @@ export default async function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: "ダッシュボード", icon: "📊" },
     { href: "/dashboard/customization", label: "店舗カスタマイズ", icon: "🎨" },
+    { href: "/dashboard/services", label: "サービスメニュー", icon: "🛠️" },
     { href: "/dashboard/availability", label: "営業時間・枠設定", icon: "📅" },
     { href: "/dashboard/reservations", label: "予約管理", icon: "📋" },
     { href: "/dashboard/subscriptions", label: "サブスクプラン", icon: "🔄" },

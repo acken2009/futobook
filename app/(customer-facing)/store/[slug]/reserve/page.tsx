@@ -14,8 +14,9 @@ export default async function ReservePage({ params }: Props) {
     .from("stores")
     .select(`
       id, name, slug,
+      stripe_account_status,
       store_customizations(primary_color, secondary_color),
-      service_items(id, name, price, duration_minutes),
+      service_items(id, name, price, duration_minutes, is_active),
       reservation_settings(*),
       availability_schedules(*)
     `)
@@ -45,7 +46,7 @@ export default async function ReservePage({ params }: Props) {
       <div className="max-w-lg mx-auto px-4 py-8">
         <ReserveForm
           store={store}
-          services={(store.service_items as any[]) ?? []}
+          services={((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false)}
           settings={(store.reservation_settings as any) ?? null}
           schedules={(store.availability_schedules as any[]) ?? []}
           primaryColor={custom?.primary_color ?? "#3B82F6"}
