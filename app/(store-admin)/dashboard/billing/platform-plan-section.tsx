@@ -17,6 +17,39 @@ interface Props {
   storeId: string;
 }
 
+// プランごとのアピールポイント
+function getPlanBadge(plan: Plan): string | null {
+  if (plan.name === "ベーシック") return "人気";
+  if (plan.name === "スタンダード") return "おすすめ";
+  return null;
+}
+
+function getPlanFeatures(plan: Plan): string[] {
+  const features: string[] = [];
+  if (plan.max_reservations_per_month) {
+    features.push(`月${plan.max_reservations_per_month}件まで予約`);
+  } else {
+    features.push("予約件数 無制限");
+  }
+  features.push(`取引手数料 ${(plan.transaction_fee_pct * 100).toFixed(0)}%`);
+
+  if (plan.name === "スターター") {
+    features.push("店舗ページ公開");
+    features.push("基本カスタマイズ");
+  } else if (plan.name === "ベーシック") {
+    features.push("全機能利用可能");
+    features.push("ギャラリー写真");
+    features.push("サブスクプラン販売");
+  } else if (plan.name === "スタンダード") {
+    features.push("全機能利用可能");
+    features.push("優先サポート");
+    features.push("複数スタッフ対応（予定）");
+  } else {
+    features.push("全機能利用可能");
+  }
+  return features;
+}
+
 export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +75,10 @@ export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }:
     window.location.href = data.url;
   }
 
+  // スターター（¥0）プランのIDを特定
+  const starterPlan = plans.find((p) => p.price === 0);
+  const isOnStarter = !currentPlanId || (starterPlan && currentPlanId === starterPlan.id);
+
   return (
     <div>
       {error && (
@@ -51,60 +88,53 @@ export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }:
       )}
 
       <div className="grid sm:grid-cols-3 gap-4">
-        {/* フリープラン */}
-        <div
-          className={`border rounded-xl p-5 ${
-            !currentPlanId ? "border-blue-500 bg-blue-50" : "border-gray-200"
-          }`}
-        >
-          <h3 className="font-bold text-lg mb-1">Free</h3>
-          <p className="text-2xl font-bold mb-1">¥0</p>
-          <p className="text-sm text-gray-500 mb-4">/月</p>
-          <ul className="text-sm text-gray-600 space-y-1 mb-6">
-            <li>✓ 月100件まで予約</li>
-            <li>✓ 手数料 5%</li>
-            <li>✓ 基本カスタマイズ</li>
-          </ul>
-          <div
-            className={`text-center text-sm py-2 rounded-lg font-medium ${
-              !currentPlanId
-                ? "bg-blue-600 text-white"
-                : "border border-gray-300 text-gray-500"
-            }`}
-          >
-            {!currentPlanId ? "現在のプラン" : "フリーのまま利用"}
-          </div>
-        </div>
-
-        {/* 有料プラン */}
         {plans.map((plan) => {
-          const isCurrent = currentPlanId === plan.id;
+          const isCurrent = plan.price === 0 ? !!isOnStarter : currentPlanId === plan.id;
+          const badge = getPlanBadge(plan);
+          const features = getPlanFeatures(plan);
+          const isFree = plan.price === 0;
+
           return (
             <div
               key={plan.id}
-              className={`border rounded-xl p-5 ${
-                isCurrent ? "border-blue-500 bg-blue-50" : "border-gray-200"
+              className={`relative border rounded-xl p-5 flex flex-col ${
+                isCurrent
+                  ? "border-blue-500 bg-blue-50"
+                  : plan.name === "スタンダード"
+                  ? "border-gray-300"
+                  : "border-gray-200"
               }`}
             >
+              {badge && (
+                <span className="absolute -top-2.5 left-4 bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {badge}
+                </span>
+              )}
+
               <h3 className="font-bold text-lg mb-1">{plan.name}</h3>
-              <p className="text-2xl font-bold mb-1">
-                {formatCurrency(plan.price)}
-              </p>
-              <p className="text-sm text-gray-500 mb-4">/月</p>
-              <ul className="text-sm text-gray-600 space-y-1 mb-6">
-                <li>
-                  ✓{" "}
-                  {plan.max_reservations_per_month
-                    ? `月${plan.max_reservations_per_month}件まで予約`
-                    : "予約件数無制限"}
-                </li>
-                <li>✓ 手数料 {(plan.transaction_fee_pct * 100).toFixed(0)}%</li>
-                <li>✓ 全機能利用可能</li>
+              <div className="mb-4">
+                <span className="text-2xl font-bold">
+                  {isFree ? "¥0" : formatCurrency(plan.price)}
+                </span>
+                <span className="text-sm text-gray-500 ml-1">/月</span>
+              </div>
+
+              <ul className="text-sm text-gray-600 space-y-1.5 mb-6 flex-1">
+                {features.map((f, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-blue-500 mt-0.5">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
               </ul>
 
               {isCurrent ? (
                 <div className="text-center text-sm py-2 rounded-lg font-medium bg-blue-600 text-white">
                   現在のプラン
+                </div>
+              ) : isFree ? (
+                <div className="text-center text-sm py-2 rounded-lg font-medium border border-gray-300 text-gray-500">
+                  ダウングレード
                 </div>
               ) : (
                 <button

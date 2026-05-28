@@ -115,7 +115,7 @@ export default async function BillingPage({ searchParams }: Props) {
       <section className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-lg font-semibold mb-1">プラットフォームプラン</h2>
         <p className="text-sm text-gray-500 mb-6">
-          現在のプラン: <strong>{currentPlan?.name ?? "未加入（フリー）"}</strong>
+          現在のプラン: <strong>{currentPlan?.name ?? "スターター（無料）"}</strong>
           {platformSub?.current_period_end && (
             <span className="text-gray-400 ml-2">
               （次回更新: {new Date(platformSub.current_period_end).toLocaleDateString("ja-JP")}）
