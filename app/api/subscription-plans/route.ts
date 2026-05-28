@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { stripe } from "@/lib/stripe/client";
 import { apiError } from "@/lib/utils";
 import { z } from "zod";
 
@@ -24,15 +25,48 @@ export async function POST(request: NextRequest) {
   const result = CreatePlanSchema.safeParse(body);
   if (!result.success) return apiError(result.error.errors[0].message, 400);
 
-  // 店舗の所有権確認
+  // 店舗の所有権 + Stripeアカウント確認
   const { data: store } = await supabaseAdmin
     .from("stores")
-    .select("id")
+    .select("id, name, stripe_account_id, stripe_account_status")
     .eq("id", result.data.store_id)
     .eq("owner_id", user.id)
     .single();
 
   if (!store) return apiError("権限がありません", 403);
+
+  let stripeProductId: string | null = null;
+  let stripePriceId: string | null = null;
+
+  // Stripe連携済みの場合はProduct/Priceを自動作成
+  if (store.stripe_account_id && store.stripe_account_status === "active") {
+    try {
+      // Stripe Product 作成（接続アカウント上）
+      const product = await stripe.products.create(
+        {
+          name: result.data.name,
+          description: result.data.description ?? undefined,
+        },
+        { stripeAccount: store.stripe_account_id }
+      );
+      stripeProductId = product.id;
+
+      // Stripe Price 作成
+      const price = await stripe.prices.create(
+        {
+          product: product.id,
+          unit_amount: result.data.price,
+          currency: "jpy",
+          recurring: { interval: result.data.interval },
+        },
+        { stripeAccount: store.stripe_account_id }
+      );
+      stripePriceId = price.id;
+    } catch (err) {
+      console.error("Stripe product/price creation failed:", err);
+      // Stripe失敗してもDBには保存する（手動設定可能に）
+    }
+  }
 
   const { data: plan, error } = await supabaseAdmin
     .from("store_subscription_plans")
@@ -43,7 +77,9 @@ export async function POST(request: NextRequest) {
       price: result.data.price,
       interval: result.data.interval,
       features: result.data.features ?? [],
-      is_active: false, // Stripe Price IDが設定されるまで非公開
+      is_active: !!stripePriceId, // Stripe Price IDがあれば即公開
+      stripe_product_id: stripeProductId,
+      stripe_price_id: stripePriceId,
     })
     .select()
     .single();

@@ -63,6 +63,11 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
   }
 
   async function toggleActive(planId: string, isActive: boolean) {
+    const plan = localPlans.find((p) => p.id === planId);
+    if (!isActive && !plan?.stripe_price_id) {
+      alert("Stripe Price IDが設定されていないため公開できません。一度削除して新しく作成してください。");
+      return;
+    }
     const res = await fetch(`/api/subscription-plans/${planId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -73,6 +78,14 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
       setLocalPlans((prev) =>
         prev.map((p) => (p.id === planId ? { ...p, is_active: !isActive } : p))
       );
+    }
+  }
+
+  async function handleDelete(planId: string) {
+    if (!confirm("このプランを削除しますか？")) return;
+    const res = await fetch(`/api/subscription-plans/${planId}`, { method: "DELETE" });
+    if (res.ok) {
+      setLocalPlans((prev) => prev.filter((p) => p.id !== planId));
     }
   }
 
@@ -102,7 +115,7 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
                   )}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <span
                   className={`text-xs px-2 py-1 rounded-full ${
                     plan.is_active
@@ -117,6 +130,12 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
                   className="text-sm text-blue-600 hover:underline"
                 >
                   {plan.is_active ? "非公開にする" : "公開する"}
+                </button>
+                <button
+                  onClick={() => handleDelete(plan.id)}
+                  className="text-sm text-red-500 hover:underline"
+                >
+                  削除
                 </button>
               </div>
             </div>
