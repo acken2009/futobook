@@ -126,6 +126,12 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
         const { url } = await checkoutRes.json();
         window.location.href = url;
         return;
+      } else {
+        // checkout失敗 → エラー表示（予約はキャンセルしない）
+        const errData = await checkoutRes.json().catch(() => ({}));
+        setError(errData.error ?? "決済画面への移動に失敗しました。もう一度お試しください。");
+        setLoading(false);
+        return;
       }
     }
 
@@ -160,7 +166,10 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
       {/* STEP 1: サービス選択 */}
       {services.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold mb-4">① サービスを選択</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">① サービスを選択</h2>
+            <span className="text-xs text-gray-400">（任意）</span>
+          </div>
           <div className="space-y-2">
             {services.map((s) => (
               <label
@@ -344,6 +353,11 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
               <p className="text-gray-600">{selectedService.name}</p>
             )}
             <p className="text-gray-600">{partySize}名</p>
+            {selectedService?.price && selectedService.price > 0 && store.stripe_account_status === "active" && (
+              <p className="font-semibold mt-2" style={{ color: primaryColor }}>
+                料金：¥{selectedService.price.toLocaleString()}（次のページでクレジットカード決済）
+              </p>
+            )}
           </div>
 
           <button
@@ -352,7 +366,11 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
             className="w-full py-3 rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: primaryColor }}
           >
-            {loading ? "予約中..." : "予約を確定する"}
+            {loading
+              ? "処理中..."
+              : selectedService?.price && selectedService.price > 0 && store.stripe_account_status === "active"
+              ? `¥${selectedService.price.toLocaleString()} を支払って予約する`
+              : "予約を確定する"}
           </button>
         </form>
       )}
