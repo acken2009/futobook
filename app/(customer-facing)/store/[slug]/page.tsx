@@ -168,7 +168,7 @@ export default async function StorePage({ params, searchParams }: Props) {
             </Link>
             {plans.length > 0 && (
               <Link
-                href={`/store/${slug}/subscribe`}
+                href={`/store/${slug}/subscribe${isEn ? "?lang=en" : ""}`}
                 className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
               >
                 {t.subscribe}
@@ -295,7 +295,7 @@ export default async function StorePage({ params, searchParams }: Props) {
                     </ul>
                   )}
                   <Link
-                    href={`/store/${slug}/subscribe?plan=${plan.id}`}
+                    href={`/store/${slug}/subscribe?plan=${plan.id}${isEn ? "&lang=en" : ""}`}
                     className="block text-center py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: primaryColor }}
                   >
