@@ -77,9 +77,9 @@ export function MediaUploader({ storeId: _storeId, logoUrl: initialLogo, coverUr
             >
               {uploading === "logo" ? "アップロード中..." : "画像を選択"}
             </button>
-            <p className="text-xs text-gray-400 mt-1">PNG・JPG・WebP、5MB以下</p>
+            <p className="text-xs text-gray-400 mt-1">PNG・JPG・WebP・AVIF、5MB以下</p>
           </div>
-          <input ref={logoRef} type="file" accept="image/*" className="hidden"
+          <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "logo"); e.target.value = ""; }}
           />
         </div>
@@ -105,7 +105,7 @@ export function MediaUploader({ storeId: _storeId, logoUrl: initialLogo, coverUr
           <p className="text-xs text-gray-400">推奨サイズ：1200×400px</p>
           {uploading === "cover" && <span className="text-xs text-blue-500">アップロード中...</span>}
         </div>
-        <input ref={coverRef} type="file" accept="image/*" className="hidden"
+        <input ref={coverRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "cover"); e.target.value = ""; }}
         />
       </div>
@@ -142,8 +142,8 @@ export function MediaUploader({ storeId: _storeId, logoUrl: initialLogo, coverUr
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-400">店内・商品・雰囲気などの写真を追加できます（5MB以下）</p>
-        <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden"
+        <p className="text-xs text-gray-400">店内・商品・雰囲気などの写真を追加できます（PNG・JPG・WebP・AVIF、5MB以下）</p>
+        <input ref={galleryRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif" multiple className="hidden"
           onChange={async (e) => {
             const files = Array.from(e.target.files ?? []);
             for (const f of files) await uploadFile(f, "gallery");

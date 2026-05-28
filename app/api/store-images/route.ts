@@ -5,15 +5,20 @@ import { apiError } from "@/lib/utils";
 
 const BUCKET = "store-assets";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/heic", "image/heif"];
 
 async function ensureBucket() {
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+  const bucketConfig = {
+    public: true,
+    fileSizeLimit: MAX_FILE_SIZE,
+    allowedMimeTypes: ALLOWED_MIME_TYPES,
+  };
   if (!buckets?.find((b) => b.name === BUCKET)) {
-    await supabaseAdmin.storage.createBucket(BUCKET, {
-      public: true,
-      fileSizeLimit: MAX_FILE_SIZE,
-      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    });
+    await supabaseAdmin.storage.createBucket(BUCKET, bucketConfig);
+  } else {
+    // バケットが既に存在する場合は設定を更新（MIME typeを追加するため）
+    await supabaseAdmin.storage.updateBucket(BUCKET, bucketConfig);
   }
 }
 
@@ -53,6 +58,9 @@ export async function POST(request: NextRequest) {
 
   if (!file) return apiError("ファイルが必要です", 400);
   if (file.size > MAX_FILE_SIZE) return apiError("5MB以下のファイルを選択してください", 400);
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return apiError(`この画像形式（${file.type}）はサポートされていません。PNG・JPG・WebP・AVIF形式をお使いください`, 400);
+  }
 
   await ensureBucket();
 
