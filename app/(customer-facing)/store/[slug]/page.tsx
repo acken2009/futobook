@@ -41,8 +41,8 @@ export default async function StorePage({ params, searchParams }: Props) {
     .select(`
       *,
       store_customizations(*),
-      service_items(id, name, name_en, description, description_en, price, duration_minutes, is_active),
-      store_subscription_plans(id, name, name_en, description, description_en, price, interval, features, is_active)
+      service_items(*),
+      store_subscription_plans(*)
     `)
     .eq("slug", slug)
     .eq("status", "active")
@@ -50,13 +50,19 @@ export default async function StorePage({ params, searchParams }: Props) {
 
   if (!store) notFound();
 
-  // Fetch gallery images
-  const { data: galleryImages } = await supabaseAdmin
-    .from("store_images")
-    .select("id, url, alt_text")
-    .eq("store_id", store.id)
-    .order("sort_order")
-    .order("created_at");
+  // Fetch gallery images (graceful: table may not exist yet before migration)
+  let galleryImages: { id: string; url: string; alt_text: string | null }[] = [];
+  try {
+    const { data } = await supabaseAdmin
+      .from("store_images")
+      .select("id, url, alt_text")
+      .eq("store_id", store.id)
+      .order("sort_order")
+      .order("created_at");
+    if (data) galleryImages = data;
+  } catch {
+    // table not yet created — skip gallery
+  }
 
   const custom = (store.store_customizations as any);
   const services = ((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false);
@@ -67,7 +73,7 @@ export default async function StorePage({ params, searchParams }: Props) {
   const secondaryColor = custom?.secondary_color ?? "#1E40AF";
   const logoUrl = custom?.logo_url as string | null;
   const coverUrl = custom?.cover_image_url as string | null;
-  const images = galleryImages ?? [];
+  const images = galleryImages;
 
   // i18n helpers
   const t = {

@@ -16,12 +16,18 @@ export default async function CustomizationPage() {
 
   if (!store) redirect("/dashboard/onboarding");
 
-  const { data: images } = await supabaseAdmin
-    .from("store_images")
-    .select("id, url")
-    .eq("store_id", store.id)
-    .order("sort_order")
-    .order("created_at");
+  let images: { id: string; url: string }[] = [];
+  try {
+    const { data } = await supabaseAdmin
+      .from("store_images")
+      .select("id, url")
+      .eq("store_id", store.id)
+      .order("sort_order")
+      .order("created_at");
+    if (data) images = data;
+  } catch {
+    // table not yet created before migration
+  }
 
   return (
     <div className="p-8 max-w-2xl">
@@ -32,7 +38,7 @@ export default async function CustomizationPage() {
       <CustomizationForm
         storeId={store.id}
         customization={(Array.isArray(store.store_customizations) ? store.store_customizations[0] : store.store_customizations) ?? null}
-        initialImages={images ?? []}
+        initialImages={images}
       />
     </div>
   );
