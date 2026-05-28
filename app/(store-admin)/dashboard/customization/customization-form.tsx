@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import type { StoreCustomization } from "@/types/database";
 import { MediaUploader } from "./media-uploader";
 
@@ -41,9 +40,10 @@ function detectPreset(primary: string, secondary: string): string {
 }
 
 export function CustomizationForm({ storeId, customization, initialImages = [] }: Props) {
-  const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveWarning, setSaveWarning] = useState<string | null>(null);
 
   const initialPrimary = customization?.primary_color ?? "#3B82F6";
   const initialSecondary = customization?.secondary_color ?? "#1E40AF";
@@ -72,12 +72,22 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
+    setSaveWarning(null);
 
-    const { error } = await supabase
-      .from("store_customizations")
-      .upsert({ store_id: storeId, ...form }, { onConflict: "store_id" });
+    const res = await fetch("/api/store-customizations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
 
-    if (!error) setSaved(true);
+    const data = await res.json();
+    if (res.ok) {
+      setSaved(true);
+      if (data.warning) setSaveWarning(data.warning);
+    } else {
+      setSaveError(data.error ?? "保存に失敗しました");
+    }
     setSaving(false);
   }
 
@@ -304,6 +314,17 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
           initialImages={initialImages}
         />
       </section>
+
+      {saveError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+          ❌ {saveError}
+        </div>
+      )}
+      {saveWarning && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
+          ⚠️ {saveWarning}
+        </div>
+      )}
 
       <button
         type="submit"
