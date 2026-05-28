@@ -5,7 +5,9 @@ import { useState } from "react";
 interface ServiceItem {
   id: string;
   name: string;
+  name_en: string | null;
   description: string | null;
+  description_en: string | null;
   price: number | null;
   duration_minutes: number | null;
   is_active: boolean;
@@ -19,7 +21,9 @@ interface Props {
 
 const emptyForm = {
   name: "",
+  name_en: "",
   description: "",
+  description_en: "",
   price: "",
   duration_minutes: "",
 };
@@ -42,7 +46,9 @@ export function ServiceManager({ storeId: _storeId, initialItems }: Props) {
   function openEdit(item: ServiceItem) {
     setForm({
       name: item.name,
+      name_en: item.name_en ?? "",
       description: item.description ?? "",
+      description_en: item.description_en ?? "",
       price: item.price != null ? String(item.price) : "",
       duration_minutes: item.duration_minutes != null ? String(item.duration_minutes) : "",
     });
@@ -58,7 +64,9 @@ export function ServiceManager({ storeId: _storeId, initialItems }: Props) {
 
     const payload = {
       name: form.name.trim(),
+      name_en: form.name_en.trim() || null,
       description: form.description.trim() || null,
+      description_en: form.description_en.trim() || null,
       price: form.price !== "" ? Number(form.price) : null,
       duration_minutes: form.duration_minutes !== "" ? Number(form.duration_minutes) : null,
     };
@@ -212,9 +220,9 @@ export function ServiceManager({ storeId: _storeId, initialItems }: Props) {
           )}
 
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                サービス名 <span className="text-red-500">*</span>
+                サービス名（日本語）<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -226,15 +234,41 @@ export function ServiceManager({ storeId: _storeId, initialItems }: Props) {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                説明
+                Service Name (English)
+              </label>
+              <input
+                type="text"
+                value={form.name_en}
+                onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+                placeholder="e.g. Leopard Gecko Experience"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                説明（日本語）
               </label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={2}
                 placeholder="サービスの詳細説明（任意）"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description (English)
+              </label>
+              <textarea
+                value={form.description_en}
+                onChange={(e) => setForm({ ...form, description_en: e.target.value })}
+                rows={2}
+                placeholder="Service description in English (optional)"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
               />
             </div>

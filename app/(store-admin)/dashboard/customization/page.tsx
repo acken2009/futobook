@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { CustomizationForm } from "./customization-form";
 
@@ -15,6 +16,13 @@ export default async function CustomizationPage() {
 
   if (!store) redirect("/dashboard/onboarding");
 
+  const { data: images } = await supabaseAdmin
+    .from("store_images")
+    .select("id, url")
+    .eq("store_id", store.id)
+    .order("sort_order")
+    .order("created_at");
+
   return (
     <div className="p-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">店舗カスタマイズ</h1>
@@ -24,6 +32,7 @@ export default async function CustomizationPage() {
       <CustomizationForm
         storeId={store.id}
         customization={(Array.isArray(store.store_customizations) ? store.store_customizations[0] : store.store_customizations) ?? null}
+        initialImages={images ?? []}
       />
     </div>
   );

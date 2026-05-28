@@ -3,10 +3,17 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { StoreCustomization } from "@/types/database";
+import { MediaUploader } from "./media-uploader";
+
+interface StoreImage {
+  id: string;
+  url: string;
+}
 
 interface Props {
   storeId: string;
   customization: StoreCustomization | null;
+  initialImages?: StoreImage[];
 }
 
 const FONT_OPTIONS = [
@@ -33,7 +40,7 @@ function detectPreset(primary: string, secondary: string): string {
   return match ? match.label : "カスタム";
 }
 
-export function CustomizationForm({ storeId, customization }: Props) {
+export function CustomizationForm({ storeId, customization, initialImages = [] }: Props) {
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -46,6 +53,7 @@ export function CustomizationForm({ storeId, customization }: Props) {
 
   const [form, setForm] = useState({
     description: customization?.description ?? "",
+    description_en: (customization as any)?.description_en ?? "",
     primary_color: initialPrimary,
     secondary_color: initialSecondary,
     font_family: customization?.font_family ?? "inter",
@@ -81,7 +89,7 @@ export function CustomizationForm({ storeId, customization }: Props) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              店舗説明
+              店舗説明（日本語）
             </label>
             <textarea
               value={form.description}
@@ -89,6 +97,19 @@ export function CustomizationForm({ storeId, customization }: Props) {
               rows={4}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="お店の魅力や特徴を入力してください"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              店舗説明（English）
+              <span className="ml-2 text-xs text-gray-400 font-normal">英語ページで表示されます</span>
+            </label>
+            <textarea
+              value={form.description_en}
+              onChange={(e) => update("description_en", e.target.value)}
+              rows={4}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Describe your store in English"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -271,6 +292,17 @@ export function CustomizationForm({ storeId, customization }: Props) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* 画像・ギャラリー */}
+      <section className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="font-semibold mb-4">画像・ギャラリー</h2>
+        <MediaUploader
+          storeId={storeId}
+          logoUrl={(customization as any)?.logo_url}
+          coverUrl={(customization as any)?.cover_image_url}
+          initialImages={initialImages}
+        />
       </section>
 
       <button

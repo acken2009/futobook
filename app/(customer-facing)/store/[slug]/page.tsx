@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -26,8 +29,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function StorePage({ params }: Props) {
+export default async function StorePage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { lang } = await searchParams;
+  const isEn = lang === "en";
+
   const supabase = await createClient();
 
   const { data: store } = await supabase
@@ -35,14 +41,22 @@ export default async function StorePage({ params }: Props) {
     .select(`
       *,
       store_customizations(*),
-      service_items(id, name, description, price, duration_minutes),
-      store_subscription_plans(id, name, description, price, interval, features, is_active)
+      service_items(id, name, name_en, description, description_en, price, duration_minutes, is_active),
+      store_subscription_plans(id, name, name_en, description, description_en, price, interval, features, is_active)
     `)
     .eq("slug", slug)
     .eq("status", "active")
     .single();
 
   if (!store) notFound();
+
+  // Fetch gallery images
+  const { data: galleryImages } = await supabaseAdmin
+    .from("store_images")
+    .select("id, url, alt_text")
+    .eq("store_id", store.id)
+    .order("sort_order")
+    .order("created_at");
 
   const custom = (store.store_customizations as any);
   const services = ((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false);
@@ -51,33 +65,110 @@ export default async function StorePage({ params }: Props) {
   );
   const primaryColor = custom?.primary_color ?? "#3B82F6";
   const secondaryColor = custom?.secondary_color ?? "#1E40AF";
+  const logoUrl = custom?.logo_url as string | null;
+  const coverUrl = custom?.cover_image_url as string | null;
+  const images = galleryImages ?? [];
+
+  // i18n helpers
+  const t = {
+    reserve: isEn ? "Book Now" : "予約する",
+    subscribe: isEn ? "Subscribe" : "サブスク加入",
+    storeInfo: isEn ? "Store Info" : "店舗情報",
+    address: isEn ? "Address" : "住所",
+    phone: isEn ? "Phone" : "電話番号",
+    services: isEn ? "Services" : "サービスメニュー",
+    plans: isEn ? "Subscription Plans" : "サブスクリプションプラン",
+    gallery: isEn ? "Gallery" : "ギャラリー",
+    website: isEn ? "Website" : "ウェブサイト",
+    free: isEn ? "Free" : "無料",
+    min: isEn ? "min" : "分",
+    perMonth: isEn ? "/mo" : "/月",
+    perYear: isEn ? "/yr" : "/年",
+    join: isEn ? "Join" : "加入する",
+    description: isEn
+      ? (custom?.description_en || custom?.description || "")
+      : (custom?.description || ""),
+  };
+
+  const otherLang = isEn ? "ja" : "en";
+  const otherLangLabel = isEn ? "日本語" : "English";
+  const toggleHref = `/store/${slug}${otherLang === "en" ? "?lang=en" : ""}`;
+
+  function serviceName(s: any) {
+    return (isEn && s.name_en) ? s.name_en : s.name;
+  }
+  function serviceDesc(s: any) {
+    return (isEn && s.description_en) ? s.description_en : s.description;
+  }
+  function planName(p: any) {
+    return (isEn && p.name_en) ? p.name_en : p.name;
+  }
+  function planDesc(p: any) {
+    return (isEn && p.description_en) ? p.description_en : p.description;
+  }
 
   return (
     <div className="min-h-screen bg-white">
       {/* ヒーローヘッダー */}
       <header
-        className="py-16 px-4 text-white text-center"
-        style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
+        className="relative py-16 px-4 text-white text-center overflow-hidden"
+        style={coverUrl ? {} : { background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
       >
-        <h1 className="text-4xl font-bold mb-3">{store.name}</h1>
-        {custom?.description && (
-          <p className="text-lg opacity-90 max-w-xl mx-auto">{custom.description}</p>
+        {/* カバー画像背景 */}
+        {coverUrl && (
+          <>
+            <Image
+              src={coverUrl}
+              alt="cover"
+              fill
+              className="object-cover"
+              unoptimized
+              priority
+            />
+            <div
+              className="absolute inset-0"
+              style={{ background: `linear-gradient(135deg, ${primaryColor}cc 0%, ${secondaryColor}cc 100%)` }}
+            />
+          </>
         )}
-        <div className="mt-6 flex gap-4 justify-center">
+
+        {/* 言語切り替えボタン */}
+        <div className="absolute top-4 right-4 z-10">
           <Link
-            href={`/store/${slug}/reserve`}
-            className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            href={toggleHref}
+            className="inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-sm px-3 py-1.5 rounded-full transition-colors border border-white/30"
           >
-            予約する
+            🌐 {otherLangLabel}
           </Link>
-          {plans.length > 0 && (
-            <Link
-              href={`/store/${slug}/subscribe`}
-              className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
-            >
-              サブスク加入
-            </Link>
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center gap-3">
+          {/* ロゴ */}
+          {logoUrl && (
+            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/40 shadow-lg bg-white/10">
+              <Image src={logoUrl} alt="logo" width={80} height={80} className="object-cover w-full h-full" unoptimized />
+            </div>
           )}
+          <h1 className="text-4xl font-bold">{store.name}</h1>
+          {t.description && (
+            <p className="text-lg opacity-90 max-w-xl mx-auto">{t.description}</p>
+          )}
+          <div className="mt-2 flex gap-4 justify-center">
+            <Link
+              href={`/store/${slug}/reserve`}
+              className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              {t.reserve}
+            </Link>
+            {plans.length > 0 && (
+              <Link
+                href={`/store/${slug}/subscribe`}
+                className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              >
+                {t.subscribe}
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -85,17 +176,17 @@ export default async function StorePage({ params }: Props) {
         {/* 店舗情報 */}
         {(custom?.address || custom?.phone) && (
           <section className="mb-12">
-            <h2 className="text-xl font-bold mb-4">店舗情報</h2>
+            <h2 className="text-xl font-bold mb-4">{t.storeInfo}</h2>
             <div className="bg-gray-50 rounded-xl p-6 grid sm:grid-cols-2 gap-4">
               {custom?.address && (
                 <div>
-                  <p className="text-sm text-gray-500">住所</p>
+                  <p className="text-sm text-gray-500">{t.address}</p>
                   <p className="font-medium">{custom.address}</p>
                 </div>
               )}
               {custom?.phone && (
                 <div>
-                  <p className="text-sm text-gray-500">電話番号</p>
+                  <p className="text-sm text-gray-500">{t.phone}</p>
                   <a href={`tel:${custom.phone}`} className="font-medium hover:underline">
                     {custom.phone}
                   </a>
@@ -105,10 +196,34 @@ export default async function StorePage({ params }: Props) {
           </section>
         )}
 
+        {/* ギャラリー */}
+        {images.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-xl font-bold mb-4">{t.gallery}</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {images.map((img) => (
+                <div
+                  key={img.id}
+                  className="aspect-square rounded-xl overflow-hidden bg-gray-100"
+                >
+                  <Image
+                    src={img.url}
+                    alt={img.alt_text ?? ""}
+                    width={400}
+                    height={400}
+                    className="object-cover w-full h-full"
+                    unoptimized
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* サービスメニュー */}
         {services.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-xl font-bold mb-4">サービスメニュー</h2>
+            <h2 className="text-xl font-bold mb-4">{t.services}</h2>
             <div className="grid sm:grid-cols-2 gap-4">
               {services.map((s: any) => (
                 <div
@@ -116,16 +231,16 @@ export default async function StorePage({ params }: Props) {
                   className="border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold">{s.name}</h3>
+                    <h3 className="font-semibold">{serviceName(s)}</h3>
                     <span className="text-lg font-bold" style={{ color: primaryColor }}>
-                      {s.price ? formatCurrency(s.price) : "無料"}
+                      {s.price ? formatCurrency(s.price) : t.free}
                     </span>
                   </div>
-                  {s.description && (
-                    <p className="text-sm text-gray-600 mb-2">{s.description}</p>
+                  {serviceDesc(s) && (
+                    <p className="text-sm text-gray-600 mb-2">{serviceDesc(s)}</p>
                   )}
                   {s.duration_minutes && (
-                    <p className="text-xs text-gray-400">{s.duration_minutes}分</p>
+                    <p className="text-xs text-gray-400">{s.duration_minutes}{t.min}</p>
                   )}
                 </div>
               ))}
@@ -136,7 +251,7 @@ export default async function StorePage({ params }: Props) {
                 className="inline-block px-8 py-3 rounded-lg text-white font-semibold hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: primaryColor }}
               >
-                予約する
+                {t.reserve}
               </Link>
             </div>
           </section>
@@ -145,23 +260,23 @@ export default async function StorePage({ params }: Props) {
         {/* サブスクプラン */}
         {plans.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-xl font-bold mb-4">サブスクリプションプラン</h2>
+            <h2 className="text-xl font-bold mb-4">{t.plans}</h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {plans.map((plan: any) => (
                 <div
                   key={plan.id}
                   className="border border-gray-200 rounded-xl p-6 flex flex-col"
                 >
-                  <h3 className="font-bold text-lg mb-1">{plan.name}</h3>
-                  {plan.description && (
-                    <p className="text-sm text-gray-600 mb-3">{plan.description}</p>
+                  <h3 className="font-bold text-lg mb-1">{planName(plan)}</h3>
+                  {planDesc(plan) && (
+                    <p className="text-sm text-gray-600 mb-3">{planDesc(plan)}</p>
                   )}
                   <div className="mb-4">
                     <span className="text-3xl font-bold" style={{ color: primaryColor }}>
                       {formatCurrency(plan.price)}
                     </span>
                     <span className="text-gray-500 text-sm">
-                      /{plan.interval === "month" ? "月" : "年"}
+                      {plan.interval === "month" ? t.perMonth : t.perYear}
                     </span>
                   </div>
                   {Array.isArray(plan.features) && plan.features.length > 0 && (
@@ -178,7 +293,7 @@ export default async function StorePage({ params }: Props) {
                     className="block text-center py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    加入する
+                    {t.join}
                   </Link>
                 </div>
               ))}
@@ -197,7 +312,7 @@ export default async function StorePage({ params }: Props) {
                   rel="noopener noreferrer"
                   className="text-gray-500 hover:text-gray-700 text-sm"
                 >
-                  🌐 ウェブサイト
+                  🌐 {t.website}
                 </a>
               )}
               {custom?.instagram_url && (

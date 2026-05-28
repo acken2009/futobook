@@ -27,7 +27,9 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
 
   const [form, setForm] = useState({
     name: "",
+    name_en: "",
     description: "",
+    description_en: "",
     price: "",
     interval: "month" as "month" | "year",
     features: "",
@@ -43,7 +45,9 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
       body: JSON.stringify({
         store_id: storeId,
         name: form.name,
+        name_en: form.name_en || null,
         description: form.description || null,
+        description_en: form.description_en || null,
         price: Number(form.price),
         interval: form.interval,
         features: form.features
@@ -57,7 +61,7 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
       const { plan } = await res.json();
       setLocalPlans((prev) => [...prev, plan]);
       setShowForm(false);
-      setForm({ name: "", description: "", price: "", interval: "month", features: "" });
+      setForm({ name: "", name_en: "", description: "", description_en: "", price: "", interval: "month", features: "" });
     }
     setSaving(false);
   }
@@ -148,7 +152,7 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
           <h3 className="font-medium">新しいプランを作成</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">プラン名</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">プラン名（日本語）</label>
               <input
                 type="text"
                 value={form.name}
@@ -156,6 +160,16 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
                 required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="月額スタンダード"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plan Name (English)</label>
+              <input
+                type="text"
+                value={form.name_en}
+                onChange={(e) => setForm((f) => ({ ...f, name_en: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Monthly Standard"
               />
             </div>
             <div>
@@ -170,29 +184,41 @@ export function SubscriptionPlanManager({ storeId, plans, canAcceptPayments }: P
                 placeholder="2980"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">請求サイクル</label>
+              <select
+                value={form.interval}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, interval: e.target.value as "month" | "year" }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="month">月額</option>
+                <option value="year">年額</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">請求サイクル</label>
-            <select
-              value={form.interval}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, interval: e.target.value as "month" | "year" }))
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="month">月額</option>
-              <option value="year">年額</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">説明（任意）</label>
-            <input
-              type="text"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="基本的なサービスが利用できるプランです"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">説明（日本語・任意）</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="基本的なサービスが利用できるプランです"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description (English)</label>
+              <input
+                type="text"
+                value={form.description_en}
+                onChange={(e) => setForm((f) => ({ ...f, description_en: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="A plan for basic services"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

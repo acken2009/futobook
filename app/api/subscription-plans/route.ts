@@ -8,7 +8,9 @@ import { z } from "zod";
 const CreatePlanSchema = z.object({
   store_id: z.string().uuid(),
   name: z.string().min(1).max(100),
+  name_en: z.string().max(100).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
+  description_en: z.string().max(500).nullable().optional(),
   price: z.number().int().min(1),
   interval: z.enum(["month", "year"]),
   features: z.array(z.string()).optional(),
@@ -73,7 +75,9 @@ export async function POST(request: NextRequest) {
     .insert({
       store_id: result.data.store_id,
       name: result.data.name,
+      name_en: result.data.name_en ?? null,
       description: result.data.description ?? null,
+      description_en: result.data.description_en ?? null,
       price: result.data.price,
       interval: result.data.interval,
       features: result.data.features ?? [],
