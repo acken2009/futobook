@@ -24,7 +24,7 @@ const emptyForm = {
   duration_minutes: "",
 };
 
-export function ServiceManager({ storeId, initialItems }: Props) {
+export function ServiceManager({ storeId: _storeId, initialItems }: Props) {
   const [items, setItems] = useState<ServiceItem[]>(initialItems);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
