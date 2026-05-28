@@ -16,15 +16,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No signature" }, { status: 400 });
   }
 
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("STRIPE_WEBHOOK_SECRET is not set");
+    return Response.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
   let event;
   try {
     event = await verifyWebhookSignature(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+    console.error("Webhook signature verification failed:", err instanceof Error ? err.message : err);
     return Response.json({ error: "Invalid signature" }, { status: 400 });
   }
 

@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { stripe } from "@/lib/stripe/client";
 import { redirect } from "next/navigation";
 import { ConnectOnboarding } from "./connect-onboarding";
 import { PlatformPlanSection } from "./platform-plan-section";
@@ -29,6 +31,29 @@ export default async function BillingPage({ searchParams }: Props) {
     .single();
 
   if (!store) redirect("/dashboard/onboarding");
+
+  // Stripeから戻ってきた場合はリアルタイムでステータスを確認・更新
+  if (connect === "success" && store.stripe_account_id) {
+    try {
+      const account = await stripe.accounts.retrieve(store.stripe_account_id);
+      const freshStatus =
+        account.charges_enabled && account.payouts_enabled
+          ? "active"
+          : account.details_submitted
+          ? "restricted"
+          : "pending";
+
+      if (freshStatus !== store.stripe_account_status) {
+        await supabaseAdmin
+          .from("stores")
+          .update({ stripe_account_status: freshStatus })
+          .eq("id", store.id);
+        store.stripe_account_status = freshStatus;
+      }
+    } catch (e) {
+      console.error("Failed to refresh Stripe account status:", e);
+    }
+  }
 
   // プラットフォームプラン一覧
   const { data: plans } = await supabase
