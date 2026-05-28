@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
   // description_en / name_en カラムが存在しない場合（マイグレーション未実行）は
   // それらを除いて再試行する
   if (fullError.message?.includes("column") || fullError.code === "42703") {
-    const { description_en: _de, name_en: _ne, ...fallbackBody } = body;
+    const fallbackBody = Object.fromEntries(
+      Object.entries(body).filter(([k]) => k !== "description_en" && k !== "name_en")
+    );
     const { error: fallbackError } = await supabaseAdmin
       .from("store_customizations")
       .upsert({ store_id: store.id, ...fallbackBody }, { onConflict: "store_id" });
