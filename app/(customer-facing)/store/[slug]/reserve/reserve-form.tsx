@@ -27,7 +27,9 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
   const [step, setStep] = useState<Step>(
     services.length > 0 ? "select-service" : "select-datetime"
   );
-  const [selectedService, setSelectedService] = useState<Props["services"][0] | null>(null);
+  const [selectedService, setSelectedService] = useState<Props["services"][0] | null>(
+    services.length > 0 ? services[0] : null
+  );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [partySize, setPartySize] = useState(1);
