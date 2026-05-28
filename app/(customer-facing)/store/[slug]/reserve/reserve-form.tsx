@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { addDays, format, isSameDay, setHours, setMinutes } from "date-fns";
-import { ja } from "date-fns/locale";
+import { ja, enUS } from "date-fns/locale";
 
 interface Props {
   store: { id: string; name: string; slug: string; stripe_account_status?: string };
@@ -19,12 +19,16 @@ interface Props {
     is_closed: boolean;
   }>;
   primaryColor: string;
-  bookedSlots?: string[]; // ISO datetime strings of already-booked slots
+  bookedSlots?: string[];
+  lang?: "ja" | "en";
 }
 
 type Step = "select-service" | "select-datetime" | "enter-info" | "done";
 
-export function ReserveForm({ store, services, settings, schedules, primaryColor, bookedSlots = [] }: Props) {
+export function ReserveForm({ store, services, settings, schedules, primaryColor, bookedSlots = [], lang = "ja" }: Props) {
+  const isEn = lang === "en";
+  const locale = isEn ? enUS : ja;
+
   const [step, setStep] = useState<Step>(
     services.length > 0 ? "select-service" : "select-datetime"
   );
@@ -45,18 +49,51 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
   const advanceDays = settings?.advance_booking_days ?? 30;
   const maxParty = settings?.max_party_size ?? 4;
 
-  // 予約可能な日付一覧（今日〜advance_booking_days日後、かつ空きスロットがある日のみ）
+  // Translation helpers
+  const t = {
+    selectService: isEn ? "① Select Service" : "① サービスを選択",
+    optional: isEn ? "(optional)" : "（任意）",
+    selectDatetime: isEn ? "② Select Date & Time" : "② 日時を選択",
+    selectDatetimeFirst: isEn ? "① Select Date & Time" : "① 日時を選択",
+    date: isEn ? "Date" : "日付",
+    time: isEn ? "Time" : "時間",
+    customerInfo: isEn ? "③ Your Details" : "③ お客様情報",
+    customerInfoFirst: isEn ? "② Your Details" : "② お客様情報",
+    name: isEn ? "Full Name" : "お名前",
+    email: isEn ? "Email" : "メールアドレス",
+    phone: isEn ? "Phone" : "電話番号",
+    guests: isEn ? "Guests" : "人数",
+    notes: isEn ? "Notes / Requests" : "ご要望・備考",
+    namePlaceholder: isEn ? "John Smith" : "田中 太郎",
+    emailPlaceholder: isEn ? "john@example.com" : "tanaka@example.com",
+    phonePlaceholder: isEn ? "+1 234-567-8901" : "090-1234-5678",
+    notesPlaceholder: isEn ? "Any special requests or allergies..." : "アレルギーや特別なご要望があればご記入ください",
+    confirm: isEn ? "Booking Summary" : "予約内容の確認",
+    price: isEn ? "Amount" : "料金",
+    creditCard: isEn ? "(credit card on next page)" : "（次のページでクレジットカード決済）",
+    submit: isEn ? "Confirm Booking" : "予約を確定する",
+    submitPay: (amount: string) => isEn ? `Pay ${amount} & Book` : `${amount} を支払って予約する`,
+    processing: isEn ? "Processing..." : "処理中...",
+    free: isEn ? "Free" : "無料",
+    min: isEn ? "min" : "分",
+    person: (n: number) => isEn ? `${n} ${n === 1 ? "guest" : "guests"}` : `${n}名`,
+    doneTitle: isEn ? "Booking Confirmed!" : "予約が完了しました！",
+    doneBody: (n: string) => isEn ? `We received your booking, ${n}.` : `${n} 様の予約を受け付けました。`,
+    doneMail: (e: string) => isEn ? `A confirmation email was sent to ${e}.` : `確認メールを ${e} に送信しました。`,
+    backToStore: isEn ? "Back to Store" : "店舗ページに戻る",
+    errorDefault: isEn ? "Booking failed. Please try again." : "予約に失敗しました",
+    errorCheckout: isEn ? "Failed to redirect to payment. Please try again." : "決済画面への移動に失敗しました。もう一度お試しください。",
+  };
+
   const availableDates = Array.from({ length: advanceDays }, (_, i) =>
     addDays(new Date(), i + 1)
   ).filter((date) => {
     const dow = date.getDay();
     const schedule = schedules.find((s) => s.day_of_week === dow);
     if (!schedule || schedule.is_closed) return false;
-    // スロットが1つでもあれば表示（getTimeSlotsで予約済み除外済み）
     return getTimeSlots(date).length > 0;
   });
 
-  // 選択した日の時間スロット一覧（予約済みを除外）
   function getTimeSlots(date: Date): string[] {
     const dow = date.getDay();
     const schedule = schedules.find((s) => s.day_of_week === dow);
@@ -65,7 +102,6 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
     const [openH, openM] = schedule.open_time.split(":").map(Number);
     const [closeH, closeM] = schedule.close_time.split(":").map(Number);
 
-    // 予約済みの時刻セット（"HH:MM" 形式、選択日のもののみ）
     const bookedTimesForDate = new Set(
       bookedSlots
         .filter((iso) => {
@@ -111,7 +147,6 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
     const requiresPayment =
       selectedService?.price && store.stripe_account_status === "active";
 
-    // 予約を作成
     const res = await fetch("/api/reservations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -128,14 +163,13 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
 
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error ?? "予約に失敗しました");
+      setError(data.error ?? t.errorDefault);
       setLoading(false);
       return;
     }
 
     const { reservation } = await res.json();
 
-    // 有料予約の場合はStripe Checkoutへリダイレクト
     if (requiresPayment && reservation) {
       const checkoutRes = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -152,9 +186,8 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
         window.location.href = url;
         return;
       } else {
-        // checkout失敗 → エラー表示（予約はキャンセルしない）
         const errData = await checkoutRes.json().catch(() => ({}));
-        setError(errData.error ?? "決済画面への移動に失敗しました。もう一度お試しください。");
+        setError(errData.error ?? t.errorCheckout);
         setLoading(false);
         return;
       }
@@ -168,19 +201,15 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
         <div className="text-4xl mb-4">🎉</div>
-        <h2 className="text-2xl font-bold mb-2">予約が完了しました！</h2>
-        <p className="text-gray-600 mb-1">
-          {name} 様の予約を受け付けました。
-        </p>
-        <p className="text-gray-600 mb-6">
-          確認メールを {email} に送信しました。
-        </p>
+        <h2 className="text-2xl font-bold mb-2">{t.doneTitle}</h2>
+        <p className="text-gray-600 mb-1">{t.doneBody(name)}</p>
+        <p className="text-gray-600 mb-6">{t.doneMail(email)}</p>
         <a
-          href={`/store/${store.slug}`}
+          href={`/store/${store.slug}${isEn ? "?lang=en" : ""}`}
           className="inline-block text-white px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
           style={{ backgroundColor: primaryColor }}
         >
-          店舗ページに戻る
+          {t.backToStore}
         </a>
       </div>
     );
@@ -192,8 +221,8 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
       {services.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">① サービスを選択</h2>
-            <span className="text-xs text-gray-400">（任意）</span>
+            <h2 className="font-semibold">{t.selectService}</h2>
+            <span className="text-xs text-gray-400">{t.optional}</span>
           </div>
           <div className="space-y-2">
             {services.map((s) => (
@@ -216,11 +245,11 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
                 <div className="flex-1">
                   <p className="font-medium">{s.name}</p>
                   {s.duration_minutes && (
-                    <p className="text-xs text-gray-500">{s.duration_minutes}分</p>
+                    <p className="text-xs text-gray-500">{s.duration_minutes}{t.min}</p>
                   )}
                 </div>
                 <span className="font-semibold" style={{ color: primaryColor }}>
-                  {s.price ? `¥${s.price.toLocaleString()}` : "無料"}
+                  {s.price ? `¥${s.price.toLocaleString()}` : t.free}
                 </span>
               </label>
             ))}
@@ -231,12 +260,12 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
       {/* STEP 2: 日時選択 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-semibold mb-4">
-          {services.length > 0 ? "② 日時を選択" : "① 日時を選択"}
+          {services.length > 0 ? t.selectDatetime : t.selectDatetimeFirst}
         </h2>
 
         {/* 日付 */}
         <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-2">日付</p>
+          <p className="text-sm text-gray-600 mb-2">{t.date}</p>
           <div className="grid grid-cols-4 gap-2">
             {availableDates.slice(0, 14).map((date) => (
               <button
@@ -254,8 +283,8 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
                     : {}
                 }
               >
-                <p className="text-xs opacity-70">{format(date, "M/d", { locale: ja })}</p>
-                <p className="font-medium">{format(date, "EEE", { locale: ja })}</p>
+                <p className="text-xs opacity-70">{format(date, "M/d", { locale })}</p>
+                <p className="font-medium">{format(date, "EEE", { locale })}</p>
               </button>
             ))}
           </div>
@@ -264,7 +293,7 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
         {/* 時間スロット */}
         {selectedDate && (
           <div>
-            <p className="text-sm text-gray-600 mb-2">時間</p>
+            <p className="text-sm text-gray-600 mb-2">{t.time}</p>
             <div className="grid grid-cols-4 gap-2">
               {getTimeSlots(selectedDate).map((time) => (
                 <button
@@ -292,7 +321,7 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
       {selectedDate && selectedTime && (
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold mb-4">
-            {services.length > 0 ? "③ お客様情報" : "② お客様情報"}
+            {services.length > 0 ? t.customerInfo : t.customerInfoFirst}
           </h2>
 
           {error && (
@@ -304,7 +333,7 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                お名前 <span className="text-red-500">*</span>
+                {t.name} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -312,12 +341,12 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="田中 太郎"
+                placeholder={t.namePlaceholder}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                メールアドレス <span className="text-red-500">*</span>
+                {t.email} <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -325,24 +354,24 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="tanaka@example.com"
+                placeholder={t.emailPlaceholder}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                電話番号
+                {t.phone}
               </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="090-1234-5678"
+                placeholder={t.phonePlaceholder}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                人数
+                {t.guests}
               </label>
               <select
                 value={partySize}
@@ -350,37 +379,40 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {Array.from({ length: maxParty }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>{n}名</option>
+                  <option key={n} value={n}>{t.person(n)}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                ご要望・備考
+                {t.notes}
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="アレルギーや特別なご要望があればご記入ください"
+                placeholder={t.notesPlaceholder}
               />
             </div>
           </div>
 
-          {/* 予約内容の確認 */}
+          {/* 予約内容確認 */}
           <div className="bg-gray-50 rounded-lg p-4 my-4 text-sm">
-            <p className="font-medium mb-1">予約内容の確認</p>
+            <p className="font-medium mb-1">{t.confirm}</p>
             <p className="text-gray-600">
-              {format(selectedDate, "yyyy年M月d日(EEE)", { locale: ja })} {selectedTime}〜
+              {isEn
+                ? format(selectedDate, "MMMM d, yyyy (EEE)", { locale }) + " " + selectedTime
+                : format(selectedDate, "yyyy年M月d日(EEE)", { locale }) + " " + selectedTime + "〜"}
             </p>
             {selectedService && (
               <p className="text-gray-600">{selectedService.name}</p>
             )}
-            <p className="text-gray-600">{partySize}名</p>
+            <p className="text-gray-600">{t.person(partySize)}</p>
             {selectedService?.price && selectedService.price > 0 && store.stripe_account_status === "active" && (
               <p className="font-semibold mt-2" style={{ color: primaryColor }}>
-                料金：¥{selectedService.price.toLocaleString()}（次のページでクレジットカード決済）
+                {t.price}：¥{selectedService.price.toLocaleString()}{isEn ? " " : ""}
+                <span className="font-normal text-gray-500">{t.creditCard}</span>
               </p>
             )}
           </div>
@@ -392,10 +424,10 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
             style={{ backgroundColor: primaryColor }}
           >
             {loading
-              ? "処理中..."
+              ? t.processing
               : selectedService?.price && selectedService.price > 0 && store.stripe_account_status === "active"
-              ? `¥${selectedService.price.toLocaleString()} を支払って予約する`
-              : "予約を確定する"}
+              ? t.submitPay(`¥${selectedService.price.toLocaleString()}`)
+              : t.submit}
           </button>
         </form>
       )}

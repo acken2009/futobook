@@ -161,7 +161,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           )}
           <div className="mt-2 flex gap-4 justify-center">
             <Link
-              href={`/store/${slug}/reserve`}
+              href={`/store/${slug}/reserve${isEn ? "?lang=en" : ""}`}
               className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
             >
               {t.reserve}
@@ -253,7 +253,7 @@ export default async function StorePage({ params, searchParams }: Props) {
             </div>
             <div className="mt-6 text-center">
               <Link
-                href={`/store/${slug}/reserve`}
+                href={`/store/${slug}/reserve${isEn ? "?lang=en" : ""}`}
                 className="inline-block px-8 py-3 rounded-lg text-white font-semibold hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: primaryColor }}
               >
