@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { ReserveForm } from "./reserve-form";
 
@@ -26,6 +27,21 @@ export default async function ReservePage({ params }: Props) {
 
   if (!store) notFound();
 
+  // 予約済みスロットを取得（pending/confirmed）
+  const now = new Date();
+  const future = new Date(now);
+  future.setDate(future.getDate() + 60); // 60日先まで
+
+  const { data: bookedReservations } = await supabaseAdmin
+    .from("reservations")
+    .select("reserved_at")
+    .eq("store_id", store.id)
+    .gte("reserved_at", now.toISOString())
+    .lte("reserved_at", future.toISOString())
+    .in("status", ["pending", "confirmed"]);
+
+  const bookedSlots = (bookedReservations ?? []).map((r) => r.reserved_at as string);
+
   const custom = (store.store_customizations as any);
 
   return (
@@ -50,6 +66,7 @@ export default async function ReservePage({ params }: Props) {
           settings={(store.reservation_settings as any) ?? null}
           schedules={(store.availability_schedules as any[]) ?? []}
           primaryColor={custom?.primary_color ?? "#3B82F6"}
+          bookedSlots={bookedSlots}
         />
       </div>
     </div>

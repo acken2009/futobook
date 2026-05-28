@@ -41,27 +41,29 @@ export async function POST(request: NextRequest) {
   const { type, store_id } = result.data;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-  // 店舗情報取得（手数料率・Stripeアカウントも含む）
-  const { data: store } = await supabaseAdmin
+  // 店舗情報取得
+  const { data: store, error: storeError } = await supabaseAdmin
     .from("stores")
-    .select(`
-      id, name, slug, stripe_account_id, stripe_account_status,
-      platform_plan_id,
-      platform_subscription_plans(transaction_fee_pct)
-    `)
+    .select("id, name, slug, stripe_account_id, stripe_account_status, platform_plan_id")
     .eq("id", store_id)
     .single();
 
-  if (!store) return apiError("店舗が見つかりません", 404);
+  if (storeError || !store) return apiError("店舗が見つかりません", 404);
 
   if (store.stripe_account_status !== "active") {
     return apiError("この店舗は現在決済を受け付けていません", 400);
   }
 
-  // プラットフォーム手数料率（プランによって異なる）
-  const platformFeePct =
-    (store.platform_subscription_plans as any)?.transaction_fee_pct ??
-    0.05;
+  // プラットフォーム手数料率（プランによって異なる、デフォルト5%）
+  let platformFeePct = 0.05;
+  if (store.platform_plan_id) {
+    const { data: plan } = await supabaseAdmin
+      .from("platform_subscription_plans")
+      .select("transaction_fee_pct")
+      .eq("id", store.platform_plan_id)
+      .single();
+    if (plan) platformFeePct = Number(plan.transaction_fee_pct);
+  }
 
   // ============================================================
   // 予約決済

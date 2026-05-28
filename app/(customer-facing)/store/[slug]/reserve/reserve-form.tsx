@@ -19,11 +19,12 @@ interface Props {
     is_closed: boolean;
   }>;
   primaryColor: string;
+  bookedSlots?: string[]; // ISO datetime strings of already-booked slots
 }
 
 type Step = "select-service" | "select-datetime" | "enter-info" | "done";
 
-export function ReserveForm({ store, services, settings, schedules, primaryColor }: Props) {
+export function ReserveForm({ store, services, settings, schedules, primaryColor, bookedSlots = [] }: Props) {
   const [step, setStep] = useState<Step>(
     services.length > 0 ? "select-service" : "select-datetime"
   );
@@ -44,16 +45,18 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
   const advanceDays = settings?.advance_booking_days ?? 30;
   const maxParty = settings?.max_party_size ?? 4;
 
-  // 予約可能な日付一覧（今日〜advance_booking_days日後）
+  // 予約可能な日付一覧（今日〜advance_booking_days日後、かつ空きスロットがある日のみ）
   const availableDates = Array.from({ length: advanceDays }, (_, i) =>
     addDays(new Date(), i + 1)
   ).filter((date) => {
     const dow = date.getDay();
     const schedule = schedules.find((s) => s.day_of_week === dow);
-    return schedule && !schedule.is_closed;
+    if (!schedule || schedule.is_closed) return false;
+    // スロットが1つでもあれば表示（getTimeSlotsで予約済み除外済み）
+    return getTimeSlots(date).length > 0;
   });
 
-  // 選択した日の時間スロット一覧
+  // 選択した日の時間スロット一覧（予約済みを除外）
   function getTimeSlots(date: Date): string[] {
     const dow = date.getDay();
     const schedule = schedules.find((s) => s.day_of_week === dow);
@@ -62,6 +65,23 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
     const [openH, openM] = schedule.open_time.split(":").map(Number);
     const [closeH, closeM] = schedule.close_time.split(":").map(Number);
 
+    // 予約済みの時刻セット（"HH:MM" 形式、選択日のもののみ）
+    const bookedTimesForDate = new Set(
+      bookedSlots
+        .filter((iso) => {
+          const d = new Date(iso);
+          return (
+            d.getFullYear() === date.getFullYear() &&
+            d.getMonth() === date.getMonth() &&
+            d.getDate() === date.getDate()
+          );
+        })
+        .map((iso) => {
+          const d = new Date(iso);
+          return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+        })
+    );
+
     const slots: string[] = [];
     let current = openH * 60 + openM;
     const end = closeH * 60 + closeM;
@@ -69,7 +89,10 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
     while (current + slotMinutes <= end) {
       const h = Math.floor(current / 60).toString().padStart(2, "0");
       const m = (current % 60).toString().padStart(2, "0");
-      slots.push(`${h}:${m}`);
+      const timeStr = `${h}:${m}`;
+      if (!bookedTimesForDate.has(timeStr)) {
+        slots.push(timeStr);
+      }
       current += slotMinutes;
     }
 
