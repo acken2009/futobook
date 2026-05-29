@@ -7,11 +7,11 @@ import { PlatformPlanSection } from "./platform-plan-section";
 
 
 interface Props {
-  searchParams: Promise<{ connect?: string; plan?: string; session_id?: string }>;
+  searchParams: Promise<{ connect?: string; plan?: string }>;
 }
 
 export default async function BillingPage({ searchParams }: Props) {
-  const { connect, plan, session_id } = await searchParams;
+  const { connect, plan } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
