@@ -183,7 +183,7 @@ export async function handlePaymentIntentSucceeded(
     const { data: reservation } = await supabaseAdmin
       .from("reservations")
       .select(`
-        reserved_at, party_size,
+        reserved_at, party_size, cancel_token,
         customers(name, email),
         service_items(name),
         stores(name, slug)
@@ -196,6 +196,11 @@ export async function handlePaymentIntentSucceeded(
       const store = reservation.stores as any;
       const service = reservation.service_items as any;
 
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+      const cancelUrl = reservation.cancel_token
+        ? `${appUrl}/store/${store.slug}/reserve/cancel?token=${reservation.cancel_token}`
+        : undefined;
+
       const { subject, html } = reservationConfirmationEmail({
         customerName: customer.name,
         storeName: store.name,
@@ -203,6 +208,7 @@ export async function handlePaymentIntentSucceeded(
         serviceName: service?.name,
         partySize: reservation.party_size,
         storeSlug: store.slug,
+        cancelUrl,
       });
 
       await sendEmail({
