@@ -55,6 +55,24 @@ export async function POST(request: NextRequest) {
 
   if (existingCustomers.data.length > 0) {
     stripeCustomerId = existingCustomers.data[0].id;
+
+    // ── 既存のプラットフォームサブスクリプションをキャンセル ──
+    // プラン変更時に二重請求が発生しないよう、同じ store_id を持つ
+    // アクティブなサブスクをすべて即時キャンセルする
+    const activeSubs = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: "active",
+    });
+    for (const sub of activeSubs.data) {
+      if (sub.metadata?.store_id === store.id) {
+        await stripe.subscriptions.cancel(sub.id);
+        // DBも更新（Webhookが遅延した場合のフォールバック）
+        await supabaseAdmin
+          .from("store_platform_subscriptions")
+          .update({ status: "cancelled" })
+          .eq("stripe_subscription_id", sub.id);
+      }
+    }
   } else {
     const customer = await stripe.customers.create({
       email: user.email!,
