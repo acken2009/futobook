@@ -63,7 +63,9 @@ export default async function BillingPage({ searchParams }: Props) {
     .order("price");
 
   const platformSub = (store.store_platform_subscriptions as any);
-  const currentPlan = platformSub?.platform_subscription_plans;
+  // platform_plan_id から直接プラン名を取得（Webhookの有無に依存しない）
+  const currentPlan = plans?.find((p) => p.id === store.platform_plan_id)
+    ?? platformSub?.platform_subscription_plans;
 
   return (
     <div className="p-8 max-w-3xl">
@@ -116,6 +118,9 @@ export default async function BillingPage({ searchParams }: Props) {
         <h2 className="text-lg font-semibold mb-1">プラットフォームプラン</h2>
         <p className="text-sm text-gray-500 mb-6">
           現在のプラン: <strong>{currentPlan?.name ?? "スターター（無料）"}</strong>
+          {currentPlan && currentPlan.price === 0 && (
+            <span className="text-gray-400 ml-1">（無料）</span>
+          )}
           {platformSub?.current_period_end && (
             <span className="text-gray-400 ml-2">
               （次回更新: {new Date(platformSub.current_period_end).toLocaleDateString("ja-JP")}）
