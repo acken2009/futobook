@@ -32,25 +32,34 @@ export default async function BillingPage({ searchParams }: Props) {
 
   if (!store) redirect("/dashboard/onboarding");
 
-  // プラン加入完了後のリダイレクト: Stripeセッションから直接DBを同期
-  // （Webhookの遅延・失敗に依存しないよう、成功リダイレクト時に確実に反映する）
-  if (plan === "subscribed" && session_id) {
+  // ── Stripeから最新のプラン状態を常に同期 ──
+  // Webhook・URLパラメータに依存せず、ページロードのたびにStripeの
+  // アクティブなサブスクリプションと照合してDBを最新化する
+  if (user.email) {
     try {
-      const session = await stripe.checkout.sessions.retrieve(session_id, {
-        expand: ["subscription"],
-      });
-      const sub = session.subscription as { metadata?: Record<string, string> } | null;
-      const subMeta = sub?.metadata ?? {};
-      if (subMeta.store_id === store.id && subMeta.plan_id) {
-        await supabaseAdmin
-          .from("stores")
-          .update({ platform_plan_id: subMeta.plan_id })
-          .eq("id", store.id);
-        // ローカルの store オブジェクトも更新して即時反映
-        store.platform_plan_id = subMeta.plan_id;
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+      if (customers.data.length > 0) {
+        const subs = await stripe.subscriptions.list({
+          customer: customers.data[0].id,
+          status: "active",
+          limit: 10,
+        });
+        // この店舗のアクティブなプラットフォームサブスクを探す
+        const activeSub = subs.data.find(
+          (s) => s.metadata?.store_id === store.id
+        );
+        const stripePlanId = activeSub?.metadata?.plan_id ?? null;
+
+        if (stripePlanId !== store.platform_plan_id) {
+          await supabaseAdmin
+            .from("stores")
+            .update({ platform_plan_id: stripePlanId })
+            .eq("id", store.id);
+          store.platform_plan_id = stripePlanId;
+        }
       }
     } catch (e) {
-      console.error("Failed to sync plan from Stripe session:", e);
+      console.error("Failed to sync plan from Stripe:", e);
     }
   }
 
