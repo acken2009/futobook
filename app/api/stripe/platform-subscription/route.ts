@@ -42,37 +42,45 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (!plan) return apiError("プランが見つかりません", 404);
-  if (plan.stripe_price_id === "price_placeholder_starter" ||
-      plan.stripe_price_id.startsWith("price_placeholder")) {
-    return apiError("Stripe Price IDが設定されていません。管理者にお問い合わせください。", 400);
-  }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
-
-  // 既存のStripe Customerを検索、なければ作成
+  // ── 既存のStripeサブスクをキャンセル（共通処理） ──
   const existingCustomers = await stripe.customers.list({ email: user.email!, limit: 1 });
-  let stripeCustomerId: string;
-
   if (existingCustomers.data.length > 0) {
-    stripeCustomerId = existingCustomers.data[0].id;
-
-    // ── 既存のプラットフォームサブスクリプションをキャンセル ──
-    // プラン変更時に二重請求が発生しないよう、同じ store_id を持つ
-    // アクティブなサブスクをすべて即時キャンセルする
     const activeSubs = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
+      customer: existingCustomers.data[0].id,
       status: "active",
     });
     for (const sub of activeSubs.data) {
       if (sub.metadata?.store_id === store.id) {
         await stripe.subscriptions.cancel(sub.id);
-        // DBも更新（Webhookが遅延した場合のフォールバック）
         await supabaseAdmin
           .from("store_platform_subscriptions")
           .update({ status: "cancelled" })
           .eq("stripe_subscription_id", sub.id);
       }
     }
+  }
+
+  // ── 無料プラン（スターター）へのダウングレード ──
+  // Stripe Checkoutは不要。既存サブスクをキャンセルしてDBを更新するだけ
+  if (plan.price === 0) {
+    await supabaseAdmin
+      .from("stores")
+      .update({ platform_plan_id: plan.id })
+      .eq("id", store.id);
+    return Response.json({ downgraded: true });
+  }
+
+  // ── 有料プランへの変更: Stripe Checkoutセッションを作成 ──
+  if (plan.stripe_price_id.startsWith("price_placeholder")) {
+    return apiError("Stripe Price IDが設定されていません。管理者にお問い合わせください。", 400);
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+
+  let stripeCustomerId: string;
+  if (existingCustomers.data.length > 0) {
+    stripeCustomerId = existingCustomers.data[0].id;
   } else {
     const customer = await stripe.customers.create({
       email: user.email!,
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
         plan_id: plan.id,
       },
     },
-    success_url: `${appUrl}/dashboard/billing?plan=subscribed&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${appUrl}/dashboard/billing?plan=subscribed`,
     cancel_url: `${appUrl}/dashboard/billing`,
   });
 

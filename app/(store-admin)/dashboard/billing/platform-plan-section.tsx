@@ -71,7 +71,13 @@ export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }:
       return;
     }
 
-    // Stripe Checkoutへリダイレクト
+    if (data.downgraded) {
+      // 無料プランへのダウングレード完了 → ページリロードで反映
+      window.location.href = "/dashboard/billing?plan=subscribed";
+      return;
+    }
+
+    // 有料プラン → Stripe Checkoutへリダイレクト
     window.location.href = data.url;
   }
 
@@ -133,9 +139,13 @@ export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }:
                   現在のプラン
                 </div>
               ) : isFree ? (
-                <div className="text-center text-sm py-2 rounded-lg font-medium border border-gray-300 text-gray-500">
-                  ダウングレード
-                </div>
+                <button
+                  onClick={() => handleSelectPlan(plan.id)}
+                  disabled={loading === plan.id}
+                  className="w-full py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  {loading === plan.id ? "処理中..." : "ダウングレード"}
+                </button>
               ) : (
                 <button
                   onClick={() => handleSelectPlan(plan.id)}
