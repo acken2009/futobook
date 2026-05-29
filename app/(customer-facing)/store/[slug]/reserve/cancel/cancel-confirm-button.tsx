@@ -11,6 +11,8 @@ interface Props {
 export default function CancelConfirmButton({ token, storeSlug }: Props) {
   const [loading, setLoading] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<number | null>(null);
+  const [refundPct, setRefundPct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCancel() {
@@ -24,6 +26,11 @@ export default function CancelConfirmButton({ token, storeSlug }: Props) {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.refundAmount > 0) {
+          setRefundAmount(data.refundAmount);
+          setRefundPct(data.refundPct);
+        }
         setCancelled(true);
       } else {
         const data = await res.json().catch(() => ({}));
@@ -41,9 +48,15 @@ export default function CancelConfirmButton({ token, storeSlug }: Props) {
       <div className="text-center">
         <div className="text-4xl mb-3">✅</div>
         <p className="font-semibold text-gray-800 mb-1">キャンセルが完了しました</p>
-        <p className="text-sm text-gray-500 mb-5">
+        <p className="text-sm text-gray-500 mb-4">
           確認メールをお送りしましたのでご確認ください。
         </p>
+        {refundAmount != null && refundPct != null && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-5 text-sm text-green-800">
+            💴 {refundPct}%返金（¥{refundAmount.toLocaleString("ja-JP")}）を処理しました。<br />
+            <span className="text-green-600 text-xs">カードへの反映には数営業日かかる場合があります。</span>
+          </div>
+        )}
         <Link
           href={`/store/${storeSlug}`}
           className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm"

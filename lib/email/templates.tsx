@@ -216,6 +216,8 @@ export interface ReservationCancellationEmailData {
   serviceName?: string;
   partySize: number;
   storeSlug: string;
+  refundAmount?: number; // 返金額（円）
+  refundPct?: number;    // 返金率（%）
 }
 
 export function reservationCancellationEmail(data: ReservationCancellationEmailData): {
@@ -257,9 +259,19 @@ export function reservationCancellationEmail(data: ReservationCancellationEmailD
       </table>
     </div>
 
+    ${data.refundAmount != null && data.refundPct != null ? `
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <p style="color: #166534; font-size: 14px; font-weight: 600; margin: 0 0 4px;">💴 返金について</p>
+      <p style="color: #15803d; font-size: 14px; margin: 0;">
+        ${data.refundPct}%返金（¥${data.refundAmount.toLocaleString("ja-JP")}）をStripeを通じて処理しました。<br>
+        カードへの反映には数営業日かかる場合があります。
+      </p>
+    </div>
+    ` : `
     <p style="color: #374151; font-size: 14px; margin-bottom: 24px;">
       またのご利用をお待ちしております。
     </p>
+    `}
 
     <a href="${appUrl}/store/${data.storeSlug}"
        style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
