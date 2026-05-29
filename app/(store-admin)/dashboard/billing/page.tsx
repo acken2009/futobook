@@ -7,11 +7,11 @@ import { PlatformPlanSection } from "./platform-plan-section";
 
 
 interface Props {
-  searchParams: Promise<{ connect?: string }>;
+  searchParams: Promise<{ connect?: string; plan?: string; session_id?: string }>;
 }
 
 export default async function BillingPage({ searchParams }: Props) {
-  const { connect } = await searchParams;
+  const { connect, plan, session_id } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -31,6 +31,28 @@ export default async function BillingPage({ searchParams }: Props) {
     .single();
 
   if (!store) redirect("/dashboard/onboarding");
+
+  // プラン加入完了後のリダイレクト: Stripeセッションから直接DBを同期
+  // （Webhookの遅延・失敗に依存しないよう、成功リダイレクト時に確実に反映する）
+  if (plan === "subscribed" && session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(session_id, {
+        expand: ["subscription"],
+      });
+      const sub = session.subscription as { metadata?: Record<string, string> } | null;
+      const subMeta = sub?.metadata ?? {};
+      if (subMeta.store_id === store.id && subMeta.plan_id) {
+        await supabaseAdmin
+          .from("stores")
+          .update({ platform_plan_id: subMeta.plan_id })
+          .eq("id", store.id);
+        // ローカルの store オブジェクトも更新して即時反映
+        store.platform_plan_id = subMeta.plan_id;
+      }
+    } catch (e) {
+      console.error("Failed to sync plan from Stripe session:", e);
+    }
+  }
 
   // Stripeから戻ってきた場合はリアルタイムでステータスを確認・更新
   if (connect === "success" && store.stripe_account_id) {
@@ -71,6 +93,13 @@ export default async function BillingPage({ searchParams }: Props) {
     <div className="p-8 max-w-3xl">
       <h1 className="text-2xl font-bold mb-2">プラン・請求設定</h1>
       <p className="text-gray-500 mb-8">決済受け取りの設定とプラットフォーム利用プランを管理します。</p>
+
+      {/* プラン加入完了メッセージ */}
+      {plan === "subscribed" && (
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 mb-6">
+          ✅ プランの変更が完了しました！
+        </div>
+      )}
 
       {/* Connect 成功/リフレッシュメッセージ */}
       {connect === "success" && (

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         plan_id: plan.id,
       },
     },
-    success_url: `${appUrl}/dashboard/billing?connect=success&plan=subscribed`,
+    success_url: `${appUrl}/dashboard/billing?plan=subscribed&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/dashboard/billing`,
   });
 
