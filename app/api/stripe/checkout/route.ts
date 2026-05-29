@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { stripe, calculatePlatformFee } from "@/lib/stripe/client";
+import { stripe } from "@/lib/stripe/client";
+import { calculatePlatformFee, calculateSubscriptionFeePercent } from "@/lib/stripe/fees";
 import { apiError } from "@/lib/utils";
 import { checkoutRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
     if (!plan.stripe_price_id)
       return apiError("このプランはまだ決済設定が完了していません", 400);
 
-    const appFeePercent = Math.round(platformFeePct * 100);
+    const appFeePercent = calculateSubscriptionFeePercent(platformFeePct);
 
     const session = await stripe.checkout.sessions.create(
       {

@@ -24,11 +24,5 @@ export function getStripe() {
   return stripePromise;
 }
 
-/**
- * プラットフォーム手数料を計算する（サーバー側で必ず実行）
- * @param amount - 決済金額（円）
- * @param feePct - 手数料率（例: 0.05 = 5%）
- */
-export function calculatePlatformFee(amount: number, feePct: number): number {
-  return Math.round(amount * feePct);
-}
+// 手数料計算は fees.ts に分離（Stripe SDK 非依存 → 単体テスト可能）
+export { calculatePlatformFee, calculateSubscriptionFeePercent } from "./fees";

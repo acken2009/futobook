@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { calculatePlatformFee } from "@/lib/stripe/fees";
 
 // プランデータ（実際のDBと同じ構造）
 const PLANS = [
@@ -36,10 +37,8 @@ function isOnStarter(currentPlanId: string | null, plans: typeof PLANS) {
   return !currentPlanId || (starterPlan && currentPlanId === starterPlan.id);
 }
 
-// 手数料計算ロジック
-function calcPlatformFee(amount: number, transactionFeePct: number): number {
-  return Math.floor(amount * transactionFeePct);
-}
+// 手数料計算: lib/stripe/client.ts の calculatePlatformFee を直接使う（実装との乖離を防ぐ）
+const calcPlatformFee = calculatePlatformFee;
 
 describe("現在のプラン判定", () => {
   it("platform_plan_idがnullのときはnullを返す", () => {
@@ -110,6 +109,15 @@ describe("プラットフォーム手数料計算", () => {
 
   it("スタンダード: 10000円の2%は200円", () => {
     expect(calcPlatformFee(10000, 0.02)).toBe(200);
+  });
+
+  it("端数切り上げ: 1017円の3%は30.51円 → 31円（Math.round）", () => {
+    // Math.floor なら30円、Math.round なら31円
+    expect(calcPlatformFee(1017, 0.03)).toBe(31);
+  });
+
+  it("端数切り捨て: 1016円の3%は30.48円 → 30円（Math.round）", () => {
+    expect(calcPlatformFee(1016, 0.03)).toBe(30);
   });
 });
 
