@@ -10,6 +10,7 @@ export interface ReservationEmailData {
   serviceName?: string;
   partySize: number;
   storeSlug: string;
+  cancelUrl?: string; // キャンセルリンク（トークン付きURL）
 }
 
 export interface SubscriptionEmailData {
@@ -94,9 +95,20 @@ export function reservationConfirmationEmail(data: ReservationEmailData): {
       </table>
     </div>
 
+    ${data.cancelUrl ? `
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <p style="color: #991b1b; font-size: 13px; margin: 0 0 8px; font-weight: 600;">キャンセルについて</p>
+      <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">予約日時の2時間前までキャンセル可能です。</p>
+      <a href="${data.cancelUrl}"
+         style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+        予約をキャンセルする
+      </a>
+    </div>
+    ` : `
     <p style="color: #374151; font-size: 14px; margin-bottom: 24px;">
       ご予約の変更・キャンセルは、お電話または店舗ページよりお問い合わせください。
     </p>
+    `}
 
     <a href="${appUrl}/store/${data.storeSlug}"
        style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
@@ -193,6 +205,72 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
 
   return {
     subject: `【新規予約】${data.storeName} - ${date} ${data.customerName}様`,
+    html,
+  };
+}
+
+export interface ReservationCancellationEmailData {
+  customerName: string;
+  storeName: string;
+  reservedAt: string;
+  serviceName?: string;
+  partySize: number;
+  storeSlug: string;
+}
+
+export function reservationCancellationEmail(data: ReservationCancellationEmailData): {
+  subject: string;
+  html: string;
+} {
+  const date = new Date(data.reservedAt).toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const html = baseTemplate(
+    `
+    <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 8px;">ご予約のキャンセル完了</h2>
+    <p style="color: #6b7280; margin: 0 0 24px;">${data.customerName} 様のご予約をキャンセルしました。</p>
+
+    <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">店舗</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td>
+        </tr>
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">日時</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td>
+        </tr>
+        ${data.serviceName ? `<tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">サービス</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td>
+        </tr>` : ""}
+        <tr>
+          <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">人数</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.partySize}名</td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="color: #374151; font-size: 14px; margin-bottom: 24px;">
+      またのご利用をお待ちしております。
+    </p>
+
+    <a href="${appUrl}/store/${data.storeSlug}"
+       style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+      再度予約する
+    </a>
+    `,
+    `【キャンセル完了】${data.storeName}`
+  );
+
+  return {
+    subject: `【キャンセル完了】${data.storeName} - ${date}`,
     html,
   };
 }

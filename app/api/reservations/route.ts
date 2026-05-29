@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
@@ -107,6 +108,11 @@ export async function POST(request: NextRequest) {
   const isPaid = requires_payment && totalAmount && totalAmount > 0;
   const status = isPaid ? "pending" : "confirmed";
 
+  // キャンセルトークン生成（予約日時の2時間前まで有効）
+  const cancelToken = randomBytes(32).toString("hex");
+  const reservedAtDate = new Date(reserved_at);
+  const cancelTokenExpiresAt = new Date(reservedAtDate.getTime() - 2 * 60 * 60 * 1000);
+
   const { data: reservation, error: re } = await supabaseAdmin
     .from("reservations")
     .insert({
@@ -118,6 +124,8 @@ export async function POST(request: NextRequest) {
       notes: notes ?? null,
       status,
       total_amount: totalAmount,
+      cancel_token: cancelToken,
+      cancel_token_expires_at: cancelTokenExpiresAt.toISOString(),
     })
     .select()
     .single();
@@ -134,7 +142,10 @@ export async function POST(request: NextRequest) {
 
   // 無料予約は即メール送信
   if (!isPaid) {
-    // ① 顧客への確認メール
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    const cancelUrl = `${appUrl}/store/${store.slug}/reserve/cancel?token=${cancelToken}`;
+
+    // ① 顧客への確認メール（キャンセルリンク付き）
     const { subject: custSubject, html: custHtml } = reservationConfirmationEmail({
       customerName: customer.name,
       storeName: store.name,
@@ -142,6 +153,7 @@ export async function POST(request: NextRequest) {
       serviceName,
       partySize: party_size,
       storeSlug: store.slug,
+      cancelUrl,
     });
     await sendEmail({
       to: customer.email,
@@ -155,7 +167,6 @@ export async function POST(request: NextRequest) {
     if (store.owner_id) {
       const { data: ownerUser } = await supabaseAdmin.auth.admin.getUserById(store.owner_id);
       if (ownerUser?.user?.email) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
         const { subject: ownerSubject, html: ownerHtml } = reservationNotificationEmail({
           storeName: store.name,
           customerName: customer.name,
