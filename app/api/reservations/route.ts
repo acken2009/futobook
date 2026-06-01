@@ -24,7 +24,7 @@ const ReserveSchema = z.object({
 export async function POST(request: NextRequest) {
   // レートリミット: IPアドレスベース（10分に10回まで）
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-  const rl = reservationRateLimit(ip);
+  const rl = await reservationRateLimit(ip);
   if (!rl.success) return rateLimitResponse(rl.resetAt);
 
   let body: unknown;

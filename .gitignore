@@ -17,6 +17,7 @@ build/
 
 # Supabase
 .supabase/
+supabase/.temp/
 
 # Misc
 .DS_Store

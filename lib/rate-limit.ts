@@ -1,34 +1,8 @@
 /**
- * シンプルなインメモリレートリミッター（Vercel Edge 非対応・単一サーバー用）
- * 本番環境では Upstash Redis に切り替えることを推奨
- *
- * 切り替え方法:
- *   npm install @upstash/ratelimit @upstash/redis
- *   → lib/rate-limit-redis.ts を参照
+ * レートリミッター
+ * - 本番環境（UPSTASH_REDIS_REST_URL 設定時）: Upstash Redis + Sliding Window
+ * - 開発環境（未設定時）: インメモリ Map（単一プロセス用フォールバック）
  */
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-// 古いエントリを定期的に削除（メモリリーク対策）
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-      if (entry.resetAt < now) store.delete(key);
-    }
-  },
-  60 * 1000 // 1分ごと
-);
-
-interface RateLimitOptions {
-  windowMs: number; // ウィンドウ幅（ミリ秒）
-  max: number;      // ウィンドウ内の最大リクエスト数
-}
 
 interface RateLimitResult {
   success: boolean;
@@ -36,55 +10,83 @@ interface RateLimitResult {
   resetAt: number;
 }
 
-export function rateLimit(
-  key: string,
-  options: RateLimitOptions
-): RateLimitResult {
+// ── インメモリ実装（ローカル開発用） ─────────────────────────────────────────
+
+interface MemoryEntry {
+  count: number;
+  resetAt: number;
+}
+const memoryStore = new Map<string, MemoryEntry>();
+setInterval(() => {
   const now = Date.now();
-  const entry = store.get(key);
-
-  if (!entry || entry.resetAt < now) {
-    // 新しいウィンドウ
-    const resetAt = now + options.windowMs;
-    store.set(key, { count: 1, resetAt });
-    return { success: true, remaining: options.max - 1, resetAt };
+  for (const [key, entry] of memoryStore.entries()) {
+    if (entry.resetAt < now) memoryStore.delete(key);
   }
+}, 60_000);
 
-  if (entry.count >= options.max) {
+function memoryLimit(key: string, windowMs: number, max: number): RateLimitResult {
+  const now = Date.now();
+  const entry = memoryStore.get(key);
+  if (!entry || entry.resetAt < now) {
+    const resetAt = now + windowMs;
+    memoryStore.set(key, { count: 1, resetAt });
+    return { success: true, remaining: max - 1, resetAt };
+  }
+  if (entry.count >= max) {
     return { success: false, remaining: 0, resetAt: entry.resetAt };
   }
-
   entry.count++;
-  return { success: true, remaining: options.max - entry.count, resetAt: entry.resetAt };
+  return { success: true, remaining: max - entry.count, resetAt: entry.resetAt };
 }
 
-/**
- * 予約API用レートリミット（IPアドレスベース）
- * 10分間に10回まで
- */
-export function reservationRateLimit(ip: string): RateLimitResult {
-  return rateLimit(`reservation:${ip}`, { windowMs: 10 * 60 * 1000, max: 10 });
+// ── Upstash 実装（本番用） ────────────────────────────────────────────────────
+
+type AsyncLimiter = (key: string) => Promise<RateLimitResult>;
+
+function buildUpstashLimiter(requests: number, window: string): AsyncLimiter {
+  // dynamic import で Upstash SDK を遅延ロード（インストール済みの場合のみ）
+  let limiterPromise: Promise<{ limit: (key: string) => Promise<{ success: boolean; remaining: number; reset: number }> }> | null = null;
+
+  return async (key: string): Promise<RateLimitResult> => {
+    if (!limiterPromise) {
+      const { Ratelimit } = await import("@upstash/ratelimit");
+      const { Redis } = await import("@upstash/redis");
+      const instance = new Ratelimit({
+        redis: Redis.fromEnv(),
+        limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"ms" | "s" | "m" | "h" | "d"}`),
+        analytics: false,
+      });
+      limiterPromise = Promise.resolve(instance);
+    }
+    const instance = await limiterPromise;
+    const { success, remaining, reset } = await instance.limit(key);
+    return { success, remaining, resetAt: reset };
+  };
 }
 
-/**
- * 認証API用レートリミット（メールアドレスベース）
- * 15分間に5回まで
- */
-export function authRateLimit(identifier: string): RateLimitResult {
-  return rateLimit(`auth:${identifier}`, { windowMs: 15 * 60 * 1000, max: 5 });
+const useRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+
+const upstashReservation = useRedis ? buildUpstashLimiter(10, "10 m") : null;
+const upstashCheckout    = useRedis ? buildUpstashLimiter(5,  "1 m")  : null;
+const upstashAuth        = useRedis ? buildUpstashLimiter(5,  "15 m") : null;
+
+// ── 公開 API ─────────────────────────────────────────────────────────────────
+
+export async function reservationRateLimit(ip: string): Promise<RateLimitResult> {
+  if (upstashReservation) return upstashReservation(`reservation:${ip}`);
+  return memoryLimit(`reservation:${ip}`, 10 * 60_000, 10);
 }
 
-/**
- * Checkout API用レートリミット（IPアドレスベース）
- * 1分間に5回まで
- */
-export function checkoutRateLimit(ip: string): RateLimitResult {
-  return rateLimit(`checkout:${ip}`, { windowMs: 60 * 1000, max: 5 });
+export async function checkoutRateLimit(ip: string): Promise<RateLimitResult> {
+  if (upstashCheckout) return upstashCheckout(`checkout:${ip}`);
+  return memoryLimit(`checkout:${ip}`, 60_000, 5);
 }
 
-/**
- * レートリミット超過時のレスポンスを生成
- */
+export async function authRateLimit(identifier: string): Promise<RateLimitResult> {
+  if (upstashAuth) return upstashAuth(`auth:${identifier}`);
+  return memoryLimit(`auth:${identifier}`, 15 * 60_000, 5);
+}
+
 export function rateLimitResponse(resetAt: number): Response {
   const retryAfterSec = Math.ceil((resetAt - Date.now()) / 1000);
   return Response.json(
