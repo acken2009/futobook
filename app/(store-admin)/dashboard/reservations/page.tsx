@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { ReservationActions } from "./reservation-actions";
 
 export default async function ReservationsPage() {
   const supabase = await createClient();
@@ -51,7 +52,7 @@ export default async function ReservationsPage() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {["日時", "お客様", "サービス", "人数", "ステータス"].map((h) => (
+              {["日時", "お客様", "サービス", "人数", "ステータス", "操作"].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                   {h}
                 </th>
@@ -87,6 +88,12 @@ export default async function ReservationsPage() {
                     >
                       {statusLabel[r.status] ?? r.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ReservationActions
+                      reservationId={r.id}
+                      currentStatus={r.status}
+                    />
                   </td>
                 </tr>
               ))
