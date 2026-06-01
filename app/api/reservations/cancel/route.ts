@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       id, status, cancel_token_expires_at, reserved_at, party_size,
       customers(name, email),
       service_items(name),
-      stores(id, name, slug, owner_id)
+      stores(id, name, slug, owner_id, stripe_account_id)
     `)
     .eq("cancel_token", token)
     .single();
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   const { data: payment } = await supabaseAdmin
     .from("payments")
     .select("stripe_payment_intent_id, amount")
-    .eq("reservation_id", reservation.id)
+    .contains("metadata", { reservation_id: reservation.id })
     .eq("status", "succeeded")
     .single();
 
@@ -97,14 +97,23 @@ export async function POST(request: NextRequest) {
 
     if (refundAmount > 0) {
       try {
-        await stripe.refunds.create({
-          payment_intent: payment.stripe_payment_intent_id,
-          amount: refundAmount,
-        });
+        // Connect アカウント上のPaymentIntentを返金するため stripeAccount が必要
+        const stripeAccountId = (reservation.stores as any)?.stripe_account_id;
+        const refundOptions = stripeAccountId
+          ? { stripeAccount: stripeAccountId }
+          : undefined;
+
+        await stripe.refunds.create(
+          {
+            payment_intent: payment.stripe_payment_intent_id,
+            amount: refundAmount,
+          },
+          refundOptions
+        );
         await supabaseAdmin
           .from("payments")
           .update({ status: "refunded" })
-          .eq("reservation_id", reservation.id);
+          .contains("metadata", { reservation_id: reservation.id });
       } catch (e) {
         console.error("Stripe refund failed:", e);
         // 返金失敗はログに残すがキャンセル自体は成功とする
@@ -114,7 +123,7 @@ export async function POST(request: NextRequest) {
 
   const customer = reservation.customers as unknown as { name: string; email: string } | null;
   const service = reservation.service_items as unknown as { name: string } | null;
-  const store = reservation.stores as unknown as { id: string; name: string; slug: string; owner_id: string } | null;
+  const store = reservation.stores as unknown as { id: string; name: string; slug: string; owner_id: string; stripe_account_id: string | null } | null;
 
   // ① 顧客へキャンセル完了メール
   if (customer?.email && store) {

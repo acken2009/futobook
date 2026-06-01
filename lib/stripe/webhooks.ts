@@ -183,7 +183,7 @@ export async function handlePaymentIntentSucceeded(
     const { data: reservation } = await supabaseAdmin
       .from("reservations")
       .select(`
-        reserved_at, party_size, cancel_token,
+        reserved_at, party_size, cancel_token, customer_id,
         customers(name, email),
         service_items(name),
         stores(name, slug)
@@ -195,6 +195,15 @@ export async function handlePaymentIntentSucceeded(
       const customer = reservation.customers as any;
       const store = reservation.stores as any;
       const service = reservation.service_items as any;
+
+      // payments の customer_id を更新（checkout時はnullで作成されるため）
+      if (reservation.customer_id) {
+        await supabaseAdmin
+          .from("payments")
+          .update({ customer_id: reservation.customer_id })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+          .is("customer_id", null);
+      }
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
       const cancelUrl = reservation.cancel_token
