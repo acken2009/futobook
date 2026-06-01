@@ -75,20 +75,40 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
     setSaveError(null);
     setSaveWarning(null);
 
-    const res = await fetch("/api/store-customizations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      setSaved(true);
-      if (data.warning) setSaveWarning(data.warning);
-    } else {
-      setSaveError(data.error ?? "保存に失敗しました");
+    // URL フィールドの簡易バリデーション（空文字はOK、入力がある場合はhttps?://で始まるか確認）
+    const urlFields = [
+      { key: "website_url", label: "ウェブサイト" },
+      { key: "instagram_url", label: "Instagram" },
+      { key: "twitter_url", label: "X (Twitter)" },
+    ] as const;
+    for (const { key, label } of urlFields) {
+      const val = form[key];
+      if (val && !/^https?:\/\/.+/.test(val)) {
+        setSaveError(`${label} は https:// または http:// から始まるURLを入力してください`);
+        setSaving(false);
+        return;
+      }
     }
-    setSaving(false);
+
+    try {
+      const res = await fetch("/api/store-customizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setSaved(true);
+        if (data.warning) setSaveWarning(data.warning);
+      } else {
+        setSaveError(data.error ?? "保存に失敗しました");
+      }
+    } catch {
+      setSaveError("ネットワークエラーが発生しました。接続を確認してください。");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -293,7 +313,7 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
             <div key={f.key}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
               <input
-                type="url"
+                type="text"
                 value={form[f.key as keyof typeof form]}
                 onChange={(e) => update(f.key, e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
