@@ -16,12 +16,17 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No signature" }, { status: 400 });
   }
 
+  if (!process.env.STRIPE_CONNECT_WEBHOOK_SECRET) {
+    console.error("STRIPE_CONNECT_WEBHOOK_SECRET is not set");
+    return Response.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
   let event;
   try {
     event = await verifyWebhookSignature(
       body,
       signature,
-      process.env.STRIPE_CONNECT_WEBHOOK_SECRET!
+      process.env.STRIPE_CONNECT_WEBHOOK_SECRET
     );
   } catch (err) {
     console.error("Connect Webhook signature verification failed:", err);

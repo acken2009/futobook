@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculatePlatformFee } from "@/lib/stripe/fees";
+import { calculatePlatformFee, calculateSubscriptionFeePercent } from "@/lib/stripe/fees";
 
 // プランデータ（実際のDBと同じ構造）
 const PLANS = [
@@ -118,6 +118,67 @@ describe("プラットフォーム手数料計算", () => {
 
   it("端数切り捨て: 1016円の3%は30.48円 → 30円（Math.round）", () => {
     expect(calcPlatformFee(1016, 0.03)).toBe(30);
+  });
+});
+
+describe("プラットフォーム手数料計算 エッジケース", () => {
+  it("0円の予約は手数料0円", () => {
+    expect(calcPlatformFee(0, 0.05)).toBe(0);
+  });
+
+  it("1円の5%は0.05円 → 0円（Math.round）", () => {
+    expect(calcPlatformFee(1, 0.05)).toBe(0);
+  });
+
+  it("10円の5%は0.5円 → 1円（Math.round: 0.5は切り上げ）", () => {
+    expect(calcPlatformFee(10, 0.05)).toBe(1);
+  });
+
+  it("100万円の5%は50000円", () => {
+    expect(calcPlatformFee(1_000_000, 0.05)).toBe(50_000);
+  });
+
+  it("手数料率0%のときは常に0円", () => {
+    expect(calcPlatformFee(9800, 0)).toBe(0);
+  });
+
+  it("333円の3%は9.99円 → 10円（Math.round）", () => {
+    expect(calcPlatformFee(333, 0.03)).toBe(10);
+  });
+
+  it("334円の3%は10.02円 → 10円（Math.round）", () => {
+    expect(calcPlatformFee(334, 0.03)).toBe(10);
+  });
+});
+
+describe("サブスク手数料率変換（calculateSubscriptionFeePercent）", () => {
+  it("5% → 5", () => {
+    expect(calculateSubscriptionFeePercent(0.05)).toBe(5);
+  });
+
+  it("3% → 3", () => {
+    expect(calculateSubscriptionFeePercent(0.03)).toBe(3);
+  });
+
+  it("2% → 2", () => {
+    expect(calculateSubscriptionFeePercent(0.02)).toBe(2);
+  });
+
+  it("0% → 0", () => {
+    expect(calculateSubscriptionFeePercent(0)).toBe(0);
+  });
+
+  it("10% → 10", () => {
+    expect(calculateSubscriptionFeePercent(0.10)).toBe(10);
+  });
+
+  it("浮動小数点誤差: 0.03 * 100 = 3.0000000000000004 → Math.roundで3になる", () => {
+    // JavaScript の浮動小数点: 0.03 * 100 !== 3 の場合がある
+    expect(calculateSubscriptionFeePercent(0.03)).toBe(3);
+  });
+
+  it("2.5% → 3（Math.round: 0.5は切り上げ）", () => {
+    expect(calculateSubscriptionFeePercent(0.025)).toBe(3);
   });
 });
 
