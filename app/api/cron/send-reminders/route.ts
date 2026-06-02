@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { reservationReminderEmail } from "@/lib/email/templates";
 
+export const dynamic = "force-dynamic";
+
 // Vercel Cron: 毎時0分に実行
 // 予約の24時間前（±30分ウィンドウ）にリマインダーメールを送信
 export async function GET(request: NextRequest) {
