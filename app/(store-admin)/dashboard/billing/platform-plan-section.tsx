@@ -7,6 +7,7 @@ interface Plan {
   id: string;
   name: string;
   price: number;
+  stripe_price_id: string;
   max_reservations_per_month: number | null;
   transaction_fee_pct: number;
 }
@@ -57,6 +58,17 @@ export function PlatformPlanSection({ plans, currentPlanId, storeId: _storeId }:
   async function handleSelectPlan(planId: string) {
     setLoading(planId);
     setError(null);
+
+    const selectedPlan = plans.find((p) => p.id === planId);
+    if (
+      selectedPlan &&
+      selectedPlan.price > 0 &&
+      selectedPlan.stripe_price_id.startsWith("price_placeholder")
+    ) {
+      setError("このプランはまだ設定中です。管理者にお問い合わせください。");
+      setLoading(null);
+      return;
+    }
 
     const res = await fetch("/api/stripe/platform-subscription", {
       method: "POST",

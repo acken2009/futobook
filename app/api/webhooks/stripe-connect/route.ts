@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         await handleCustomerSubscriptionUpdated(event.data.object as any);
         break;
       default:
-        console.log(`Unhandled connect event: ${event.type}`);
+        console.warn(`Unhandled connect event: ${event.type}`);
     }
   } catch (err) {
     console.error(`Error processing connect event ${event.type}:`, err);

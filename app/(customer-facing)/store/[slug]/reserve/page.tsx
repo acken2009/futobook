@@ -22,7 +22,8 @@ export default async function ReservePage({ params, searchParams }: Props) {
       store_customizations(primary_color, secondary_color),
       service_items(id, name, price, duration_minutes, is_active),
       reservation_settings(*),
-      availability_schedules(*)
+      availability_schedules(*),
+      availability_overrides(id, date, is_closed, open_time, close_time)
     `)
     .eq("slug", slug)
     .eq("status", "active")
@@ -68,6 +69,7 @@ export default async function ReservePage({ params, searchParams }: Props) {
           services={((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false)}
           settings={(store.reservation_settings as any) ?? null}
           schedules={(store.availability_schedules as any[]) ?? []}
+          overrides={(store.availability_overrides as any[]) ?? []}
           primaryColor={custom?.primary_color ?? "#3B82F6"}
           bookedSlots={bookedSlots}
           lang={isEn ? "en" : "ja"}

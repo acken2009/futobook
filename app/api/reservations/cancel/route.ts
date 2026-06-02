@@ -4,25 +4,8 @@ import { stripe } from "@/lib/stripe/client";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
 import { reservationCancellationEmail } from "@/lib/email/templates";
+import { calcRefundAmount } from "@/lib/stripe/refund";
 import { z } from "zod";
-
-/**
- * 返金ポリシー
- * - 予約24時間以上前: 全額返金
- * - 予約2〜24時間前: 50%返金
- * - 予約2時間前以内: キャンセル不可（cancel_token_expires_atで制御済み）
- */
-function calcRefundAmount(totalAmount: number, reservedAt: string): { refundAmount: number; refundPct: number } {
-  const now = new Date();
-  const reserved = new Date(reservedAt);
-  const hoursUntil = (reserved.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-  if (hoursUntil >= 24) {
-    return { refundAmount: totalAmount, refundPct: 100 };
-  } else {
-    return { refundAmount: Math.floor(totalAmount * 0.5), refundPct: 50 };
-  }
-}
 
 const CancelSchema = z.object({
   token: z.string().min(1),
@@ -68,15 +51,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // キャンセル実行
-  const { error } = await supabaseAdmin
-    .from("reservations")
-    .update({ status: "cancelled" })
-    .eq("id", reservation.id);
-
-  if (error) return apiError("キャンセルに失敗しました", 500);
-
-  // ── 返金処理（有料予約のみ） ──
+  // ── 返金処理（有料予約のみ）先に実行 ──
   let refundAmount = 0;
   let refundPct = 0;
 
@@ -96,13 +71,13 @@ export async function POST(request: NextRequest) {
     refundPct = pct;
 
     if (refundAmount > 0) {
-      try {
-        // Connect アカウント上のPaymentIntentを返金するため stripeAccount が必要
-        const stripeAccountId = (reservation.stores as any)?.stripe_account_id;
-        const refundOptions = stripeAccountId
-          ? { stripeAccount: stripeAccountId }
-          : undefined;
+      // Connect アカウント上のPaymentIntentを返金するため stripeAccount が必要
+      const stripeAccountId = (reservation.stores as any)?.stripe_account_id;
+      const refundOptions = stripeAccountId
+        ? { stripeAccount: stripeAccountId }
+        : undefined;
 
+      try {
         await stripe.refunds.create(
           {
             payment_intent: payment.stripe_payment_intent_id,
@@ -116,10 +91,18 @@ export async function POST(request: NextRequest) {
           .contains("metadata", { reservation_id: reservation.id });
       } catch (e) {
         console.error("Stripe refund failed:", e);
-        // 返金失敗はログに残すがキャンセル自体は成功とする
+        return apiError("返金処理に失敗しました。店舗に直接お問い合わせください。", 500);
       }
     }
   }
+
+  // 返金成功（または返金不要）後にキャンセル実行
+  const { error } = await supabaseAdmin
+    .from("reservations")
+    .update({ status: "cancelled" })
+    .eq("id", reservation.id);
+
+  if (error) return apiError("キャンセルに失敗しました", 500);
 
   const customer = reservation.customers as unknown as { name: string; email: string } | null;
   const service = reservation.service_items as unknown as { name: string } | null;

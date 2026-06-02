@@ -18,6 +18,13 @@ interface Props {
     close_time: string;
     is_closed: boolean;
   }>;
+  overrides?: Array<{
+    id: string;
+    date: string;
+    is_closed: boolean;
+    open_time: string | null;
+    close_time: string | null;
+  }>;
   primaryColor: string;
   bookedSlots?: string[];
   lang?: "ja" | "en";
@@ -25,7 +32,7 @@ interface Props {
 
 type Step = "select-service" | "select-datetime" | "enter-info" | "done";
 
-export function ReserveForm({ store, services, settings, schedules, primaryColor, bookedSlots = [], lang = "ja" }: Props) {
+export function ReserveForm({ store, services, settings, schedules, overrides = [], primaryColor, bookedSlots = [], lang = "ja" }: Props) {
   const isEn = lang === "en";
   const locale = isEn ? enUS : ja;
 
@@ -87,20 +94,29 @@ export function ReserveForm({ store, services, settings, schedules, primaryColor
 
   const availableDates = Array.from({ length: advanceDays }, (_, i) =>
     addDays(new Date(), i + 1)
-  ).filter((date) => {
-    const dow = date.getDay();
-    const schedule = schedules.find((s) => s.day_of_week === dow);
-    if (!schedule || schedule.is_closed) return false;
-    return getTimeSlots(date).length > 0;
-  });
+  ).filter((date) => getTimeSlots(date).length > 0);
 
   function getTimeSlots(date: Date): string[] {
-    const dow = date.getDay();
-    const schedule = schedules.find((s) => s.day_of_week === dow);
-    if (!schedule || schedule.is_closed) return [];
+    const dateStr = format(date, "yyyy-MM-dd");
+    const override = overrides.find((o) => o.date === dateStr);
 
-    const [openH, openM] = schedule.open_time.split(":").map(Number);
-    const [closeH, closeM] = schedule.close_time.split(":").map(Number);
+    let openH: number, openM: number, closeH: number, closeM: number;
+
+    if (override) {
+      if (override.is_closed) return [];
+      if (override.open_time && override.close_time) {
+        [openH, openM] = override.open_time.split(":").map(Number);
+        [closeH, closeM] = override.close_time.split(":").map(Number);
+      } else {
+        return [];
+      }
+    } else {
+      const dow = date.getDay();
+      const schedule = schedules.find((s) => s.day_of_week === dow);
+      if (!schedule || schedule.is_closed) return [];
+      [openH, openM] = schedule.open_time.split(":").map(Number);
+      [closeH, closeM] = schedule.close_time.split(":").map(Number);
+    }
 
     const bookedTimesForDate = new Set(
       bookedSlots

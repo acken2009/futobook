@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         await handlePlatformSubscriptionCreated(event.data.object as any);
         break;
       default:
-        console.log(`Unhandled platform event: ${event.type}`);
+        console.warn(`Unhandled platform event: ${event.type}`);
     }
   } catch (err) {
     console.error(`Error processing platform event ${event.type}:`, err);

@@ -48,7 +48,10 @@ export async function handlePlatformInvoicePaid(
   invoice: Stripe.Invoice
 ): Promise<void> {
   const subscriptionId = invoice.subscription as string;
-  if (!subscriptionId) return;
+  if (!subscriptionId) {
+    console.warn("handlePlatformInvoicePaid: missing subscriptionId", invoice.id);
+    return;
+  }
 
   await supabaseAdmin
     .from("store_platform_subscriptions")
@@ -173,6 +176,10 @@ export async function handlePaymentIntentSucceeded(
     .eq("stripe_payment_intent_id", paymentIntent.id);
 
   // 予約の確定 + メール送信
+  if (!metadata?.reservation_id) {
+    console.warn("handlePaymentIntentSucceeded: missing reservation_id in metadata", paymentIntent.id);
+  }
+
   if (metadata?.reservation_id) {
     await supabaseAdmin
       .from("reservations")

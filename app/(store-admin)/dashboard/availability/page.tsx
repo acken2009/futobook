@@ -22,6 +22,23 @@ type ReservationSettings = {
   requires_payment: boolean;
 };
 
+type Override = {
+  id: string;
+  date: string;
+  is_closed: boolean;
+  open_time: string | null;
+  close_time: string | null;
+  note: string | null;
+};
+
+const EMPTY_OVERRIDE_FORM = {
+  date: "",
+  is_closed: true,
+  open_time: "09:00",
+  close_time: "18:00",
+  note: "",
+};
+
 export default function AvailabilityPage() {
   const supabase = createClient();
   const [storeId, setStoreId] = useState<string | null>(null);
@@ -30,7 +47,7 @@ export default function AvailabilityPage() {
       day_of_week: i,
       open_time: "09:00",
       close_time: "18:00",
-      is_closed: i === 0 || i === 6, // 土日は休み（デフォルト）
+      is_closed: i === 0 || i === 6,
     }))
   );
   const [settings, setSettings] = useState<ReservationSettings>({
@@ -40,6 +57,11 @@ export default function AvailabilityPage() {
     cancellation_hours: 24,
     requires_payment: false,
   });
+  const [overrides, setOverrides] = useState<Override[]>([]);
+  const [showOverrideForm, setShowOverrideForm] = useState(false);
+  const [overrideForm, setOverrideForm] = useState(EMPTY_OVERRIDE_FORM);
+  const [savingOverride, setSavingOverride] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,7 +79,6 @@ export default function AvailabilityPage() {
       if (!store) return;
       setStoreId(store.id);
 
-      // 営業時間を取得
       const { data: existingSchedules } = await supabase
         .from("availability_schedules")
         .select("*")
@@ -86,7 +107,6 @@ export default function AvailabilityPage() {
         );
       }
 
-      // 予約設定を取得
       const { data: existingSettings } = await supabase
         .from("reservation_settings")
         .select("*")
@@ -104,6 +124,16 @@ export default function AvailabilityPage() {
         });
       }
 
+      const { data: existingOverrides } = await supabase
+        .from("availability_overrides")
+        .select("*")
+        .eq("store_id", store.id)
+        .order("date");
+
+      if (existingOverrides) {
+        setOverrides(existingOverrides);
+      }
+
       setLoading(false);
     }
     load();
@@ -119,7 +149,6 @@ export default function AvailabilityPage() {
     if (!storeId) return;
     setSaving(true);
 
-    // 営業時間を保存（upsert）
     const scheduleData = schedules.map((s) => ({
       ...(s.id ? { id: s.id } : {}),
       store_id: storeId,
@@ -133,7 +162,6 @@ export default function AvailabilityPage() {
       .from("availability_schedules")
       .upsert(scheduleData, { onConflict: "store_id,day_of_week" });
 
-    // 予約設定を保存（upsert）
     await supabase.from("reservation_settings").upsert(
       {
         ...(settings.id ? { id: settings.id } : {}),
@@ -152,6 +180,54 @@ export default function AvailabilityPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const handleAddOverride = async () => {
+    if (!storeId || !overrideForm.date) return;
+    setSavingOverride(true);
+
+    const { data, error } = await supabase
+      .from("availability_overrides")
+      .upsert(
+        {
+          store_id: storeId,
+          date: overrideForm.date,
+          is_closed: overrideForm.is_closed,
+          open_time: overrideForm.is_closed ? null : overrideForm.open_time,
+          close_time: overrideForm.is_closed ? null : overrideForm.close_time,
+          note: overrideForm.note || null,
+        },
+        { onConflict: "store_id,date" }
+      )
+      .select()
+      .single();
+
+    if (!error && data) {
+      setOverrides((prev) => {
+        const filtered = prev.filter((o) => o.date !== data.date);
+        return [...filtered, data].sort((a, b) => a.date.localeCompare(b.date));
+      });
+      setOverrideForm(EMPTY_OVERRIDE_FORM);
+      setShowOverrideForm(false);
+    }
+    setSavingOverride(false);
+  };
+
+  const handleDeleteOverride = async (id: string) => {
+    await supabase.from("availability_overrides").delete().eq("id", id);
+    setOverrides((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  const formatOverrideDate = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+    });
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center">
@@ -165,7 +241,7 @@ export default function AvailabilityPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-2">営業時間・枠設定</h1>
       <p className="text-gray-500 mb-8">予約を受け付ける曜日・時間帯と予約ルールを設定します。</p>
 
-      {/* 営業時間 */}
+      {/* 曜日別営業時間 */}
       <section className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">📅 曜日別営業時間</h2>
         <div className="space-y-3">
@@ -205,6 +281,138 @@ export default function AvailabilityPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* 特定日の例外設定 */}
+      <section className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">🗓️ 特定日の例外設定</h2>
+            <p className="text-sm text-gray-500 mt-0.5">祝日・夏季休業など、特定の日の営業時間を設定します</p>
+          </div>
+          {!showOverrideForm && (
+            <button
+              onClick={() => setShowOverrideForm(true)}
+              className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              + 日付を追加
+            </button>
+          )}
+        </div>
+
+        {/* 追加フォーム */}
+        {showOverrideForm && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                <input
+                  type="date"
+                  min={today}
+                  value={overrideForm.date}
+                  onChange={(e) => setOverrideForm((p) => ({ ...p, date: e.target.value }))}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overrideForm.is_closed}
+                  onChange={(e) => setOverrideForm((p) => ({ ...p, is_closed: e.target.checked }))}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                <span className="text-sm font-medium text-gray-700">この日は休業</span>
+              </label>
+
+              {!overrideForm.is_closed && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={overrideForm.open_time}
+                    onChange={(e) => setOverrideForm((p) => ({ ...p, open_time: e.target.value }))}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-400">〜</span>
+                  <input
+                    type="time"
+                    value={overrideForm.close_time}
+                    onChange={(e) => setOverrideForm((p) => ({ ...p, close_time: e.target.value }))}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ（任意）</label>
+                <input
+                  type="text"
+                  placeholder="例: 夏季休業、祝日 など"
+                  value={overrideForm.note}
+                  onChange={(e) => setOverrideForm((p) => ({ ...p, note: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddOverride}
+                  disabled={savingOverride || !overrideForm.date}
+                  className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {savingOverride ? "保存中..." : "保存する"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowOverrideForm(false);
+                    setOverrideForm(EMPTY_OVERRIDE_FORM);
+                  }}
+                  className="text-gray-600 px-4 py-1.5 rounded-lg text-sm border border-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 例外一覧 */}
+        {overrides.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">例外設定はありません</p>
+        ) : (
+          <div className="space-y-2">
+            {overrides.map((o) => (
+              <div
+                key={o.id}
+                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm ${
+                  o.date < today ? "opacity-50" : ""
+                } ${o.is_closed ? "bg-red-50 border border-red-100" : "bg-green-50 border border-green-100"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`font-medium ${o.is_closed ? "text-red-700" : "text-green-700"}`}>
+                    {o.is_closed ? "休業" : "特別営業"}
+                  </span>
+                  <span className="text-gray-700">{formatOverrideDate(o.date)}</span>
+                  {!o.is_closed && o.open_time && o.close_time && (
+                    <span className="text-gray-500">
+                      {o.open_time.slice(0, 5)} 〜 {o.close_time.slice(0, 5)}
+                    </span>
+                  )}
+                  {o.note && (
+                    <span className="text-gray-400 text-xs">({o.note})</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteOverride(o.id)}
+                  className="text-gray-400 hover:text-red-500 transition-colors text-lg leading-none"
+                  aria-label="削除"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 予約設定 */}

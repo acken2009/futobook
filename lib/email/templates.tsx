@@ -262,6 +262,139 @@ export function reservationCancellationEmail(
   return { subject: t.subject, html };
 }
 
+export interface ReservationRescheduleEmailData {
+  customerName: string;
+  storeName: string;
+  oldReservedAt: string;
+  newReservedAt: string;
+  serviceName?: string;
+  partySize: number;
+  storeSlug: string;
+  cancelUrl?: string;
+}
+
+export function reservationRescheduleEmail(
+  data: ReservationRescheduleEmailData,
+  lang: "ja" | "en" = "ja"
+): { subject: string; html: string } {
+  const isEn = lang === "en";
+  const locale = isEn ? "en-US" : "ja-JP";
+  const opts: Intl.DateTimeFormatOptions = {
+    year: "numeric", month: "long", day: "numeric",
+    weekday: "short", hour: "2-digit", minute: "2-digit",
+  };
+  const oldDate = new Date(data.oldReservedAt).toLocaleString(locale, opts);
+  const newDate = new Date(data.newReservedAt).toLocaleString(locale, opts);
+
+  const t = {
+    heading: isEn ? "Booking Rescheduled" : "ご予約日時の変更",
+    greeting: isEn
+      ? `Dear ${data.customerName}, your booking at ${data.storeName} has been rescheduled.`
+      : `${data.customerName} 様、ご予約の日時が変更されました。`,
+    before: isEn ? "Previous Date & Time" : "変更前",
+    after: isEn ? "New Date & Time" : "変更後",
+    service: isEn ? "Service" : "サービス",
+    guests: isEn ? "Guests" : "人数",
+    guestsVal: isEn ? `${data.partySize} guest${data.partySize > 1 ? "s" : ""}` : `${data.partySize}名`,
+    cancelNote: isEn ? "If you need to cancel, you can do so up to 2 hours before your new booking." : "変更後の日時の2時間前までキャンセルが可能です。",
+    cancelBtn: isEn ? "Cancel My Booking" : "予約をキャンセルする",
+    viewStore: isEn ? "View Store Page" : "店舗ページを見る",
+    subject: isEn ? `[Rescheduled] ${data.storeName} - ${newDate}` : `【日時変更】${data.storeName} - ${newDate}`,
+  };
+
+  const html = baseTemplate(
+    `
+    <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 8px;">${t.heading}</h2>
+    <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
+    <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+      <p style="font-size: 12px; color: #92400e; font-weight: 600; margin: 0 0 4px;">${t.before}</p>
+      <p style="color: #78350f; font-size: 14px; margin: 0; text-decoration: line-through;">${oldDate}</p>
+    </div>
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <p style="font-size: 12px; color: #1e40af; font-weight: 600; margin: 0 0 4px;">${t.after}</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0; width: 40%;"></td><td style="font-weight: 700; font-size: 16px; padding: 2px 0; color: #1d4ed8;">${newDate}</td></tr>
+        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0;">${t.service}</td><td style="font-size: 14px; padding: 2px 0;">${data.serviceName}</td></tr>` : ""}
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0;">${t.guests}</td><td style="font-size: 14px; padding: 2px 0;">${t.guestsVal}</td></tr>
+      </table>
+    </div>
+    ${data.cancelUrl ? `
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">${t.cancelNote}</p>
+      <a href="${data.cancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
+    </div>` : ""}
+    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
+    `,
+    t.subject,
+    lang
+  );
+
+  return { subject: t.subject, html };
+}
+
+export interface ReservationReminderEmailData {
+  customerName: string;
+  storeName: string;
+  reservedAt: string;
+  serviceName?: string;
+  partySize: number;
+  storeSlug: string;
+  cancelUrl?: string;
+}
+
+export function reservationReminderEmail(
+  data: ReservationReminderEmailData,
+  lang: "ja" | "en" = "ja"
+): { subject: string; html: string } {
+  const isEn = lang === "en";
+  const locale = isEn ? "en-US" : "ja-JP";
+  const date = new Date(data.reservedAt).toLocaleString(locale, {
+    year: "numeric", month: "long", day: "numeric",
+    weekday: "short", hour: "2-digit", minute: "2-digit",
+  });
+
+  const t = {
+    heading: isEn ? "Booking Reminder" : "予約リマインダー",
+    greeting: isEn
+      ? `Dear ${data.customerName}, your booking at ${data.storeName} is tomorrow.`
+      : `${data.customerName} 様、明日のご予約をお知らせします。`,
+    store: isEn ? "Store" : "店舗",
+    dateTime: isEn ? "Date & Time" : "日時",
+    service: isEn ? "Service" : "サービス",
+    guests: isEn ? "Guests" : "人数",
+    guestsVal: isEn ? `${data.partySize} guest${data.partySize > 1 ? "s" : ""}` : `${data.partySize}名`,
+    cancelNote: isEn ? "Need to cancel? You can cancel up to 2 hours before your booking." : "キャンセルをご希望の場合は予約日時の2時間前まで手続きが可能です。",
+    cancelBtn: isEn ? "Cancel My Booking" : "予約をキャンセルする",
+    viewStore: isEn ? "View Store Page" : "店舗ページを見る",
+    subject: isEn ? `[Reminder] ${data.storeName} - Tomorrow ${date}` : `【リマインダー】${data.storeName} - 明日 ${date}`,
+  };
+
+  const html = baseTemplate(
+    `
+    <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 8px;">${t.heading}</h2>
+    <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
+    <div style="background: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.dateTime}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td></tr>
+        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td></tr>` : ""}
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.guests}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${t.guestsVal}</td></tr>
+      </table>
+    </div>
+    ${data.cancelUrl ? `
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">${t.cancelNote}</p>
+      <a href="${data.cancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
+    </div>` : ""}
+    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
+    `,
+    t.subject,
+    lang
+  );
+
+  return { subject: t.subject, html };
+}
+
 export function subscriptionConfirmationEmail(
   data: SubscriptionEmailData,
   lang: "ja" | "en" = "ja"
