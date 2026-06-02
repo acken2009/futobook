@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  // 23.5h〜24.5h 後の予約を対象（1時間ウィンドウ＝毎時実行で重複なし）
-  const windowStart = new Date(now.getTime() + 23.5 * 60 * 60 * 1000).toISOString();
-  const windowEnd = new Date(now.getTime() + 24.5 * 60 * 60 * 1000).toISOString();
+  // 深夜0時実行：翌日（0〜24時間後）の予約を全件対象
+  const windowStart = new Date(now.getTime() + 1 * 60 * 60 * 1000).toISOString(); // 1h後から
+  const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString(); // 25h後まで
 
   const { data: reservations, error } = await supabaseAdmin
     .from("reservations")
