@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { stripe } from "./client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { sendLineMessage } from "@/lib/line/send";
 import {
   reservationConfirmationEmail,
   subscriptionConfirmationEmail,
@@ -234,6 +235,22 @@ export async function handlePaymentIntentSucceeded(
         storeId: metadata.store_id,
         type: "reservation_confirmation",
       });
+
+      // LINE通知
+      const { data: customerWithLine } = await supabaseAdmin
+        .from("customers")
+        .select("line_user_id")
+        .eq("id", reservation.customer_id)
+        .single();
+      const lineUserId = (customerWithLine as any)?.line_user_id;
+      if (lineUserId) {
+        const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
+          month: "long", day: "numeric", weekday: "short",
+          hour: "2-digit", minute: "2-digit",
+        });
+        const lineMsg = `✅ 予約確定！\n${store.name}\n${dateStr}${service?.name ? `\n${service.name}` : ""}${reservation.cancel_token ? `\n\nキャンセルはこちら:\n${process.env.NEXT_PUBLIC_APP_URL}/store/${store.slug}/reserve/cancel?token=${reservation.cancel_token}` : ""}`;
+        await sendLineMessage({ lineUserId, message: lineMsg, storeId: metadata.store_id });
+      }
     }
   }
 }
@@ -323,10 +340,12 @@ export async function handleCustomerSubscriptionCreated(
 export async function handleCustomerSubscriptionUpdated(
   subscription: Stripe.Subscription
 ): Promise<void> {
+  // Stripeは "canceled"（一重L）、DBは "cancelled"（二重L）で統一
+  const normalizedStatus = subscription.status === "canceled" ? "cancelled" : subscription.status;
   await supabaseAdmin
     .from("customer_subscriptions")
     .update({
-      status: subscription.status as string,
+      status: normalizedStatus,
       current_period_start: new Date(
         subscription.current_period_start * 1000
       ).toISOString(),
@@ -339,4 +358,88 @@ export async function handleCustomerSubscriptionUpdated(
           : null,
     })
     .eq("stripe_subscription_id", subscription.id);
+}
+
+/**
+ * 物販注文の決済完了（Connect: checkout.session.completed）
+ */
+export async function handleProductOrderCompleted(
+  session: Stripe.Checkout.Session
+): Promise<void> {
+  const { order_id, store_id } = session.metadata ?? {};
+  if (!order_id || !store_id) return;
+
+  // 注文をpaid状態に更新
+  await supabaseAdmin
+    .from("orders")
+    .update({
+      status: "paid",
+      stripe_payment_intent_id: session.payment_intent as string,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", order_id);
+
+  // 在庫を減らす
+  const { data: items } = await supabaseAdmin
+    .from("order_items")
+    .select("product_id, quantity")
+    .eq("order_id", order_id);
+
+  if (items) {
+    for (const item of items) {
+      // アトミックなデクリメント（0008_fixes.sql で定義したRPC）
+      await supabaseAdmin.rpc("decrement_stock", {
+        p_product_id: item.product_id,
+        p_quantity: item.quantity,
+      });
+    }
+  }
+
+  // 確認メール送信
+  const { data: order } = await supabaseAdmin
+    .from("orders")
+    .select("*, order_items(product_name, quantity, unit_price)")
+    .eq("id", order_id)
+    .single();
+
+  const { data: store } = await supabaseAdmin
+    .from("stores")
+    .select("name, owner_id")
+    .eq("id", store_id)
+    .single();
+
+  if (order && store) {
+    const itemsText = (order.order_items as any[])
+      .map((i: any) => `${i.product_name} × ${i.quantity}`)
+      .join("\n");
+
+    await sendEmail({
+      to: order.customer_email,
+      subject: `【${store.name}】ご注文ありがとうございます`,
+      html: `<p>${order.customer_name} 様</p>
+<p>ご注文を承りました。</p>
+<p><strong>注文内容</strong></p>
+<pre>${itemsText}</pre>
+<p>合計: ¥${order.total_amount.toLocaleString()}</p>
+<p>ご不明な点は店舗までお問い合わせください。</p>`,
+      storeId: store_id,
+      type: "order_confirmation",
+    });
+
+    // オーナーへの通知
+    if (store.owner_id) {
+      const { data: ownerUser } = await supabaseAdmin.auth.admin.getUserById(store.owner_id);
+      if (ownerUser?.user?.email) {
+        await sendEmail({
+          to: ownerUser.user.email,
+          subject: `【${store.name}】新しい注文が入りました`,
+          html: `<p>注文者: ${order.customer_name}（${order.customer_email}）</p>
+<pre>${itemsText}</pre>
+<p>合計: ¥${(order.total_amount ?? 0).toLocaleString()}</p>`,
+          storeId: store_id,
+          type: "order_notification",
+        });
+      }
+    }
+  }
 }

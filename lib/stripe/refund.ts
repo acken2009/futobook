@@ -8,8 +8,10 @@ export function calcRefundAmount(
 
   if (hoursUntil >= 24) {
     return { refundAmount: totalAmount, refundPct: 100 };
-  } else {
+  } else if (hoursUntil >= 2) {
     return { refundAmount: Math.floor(totalAmount * 0.5), refundPct: 50 };
+  } else {
+    return { refundAmount: 0, refundPct: 0 };
   }
 }
 

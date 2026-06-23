@@ -2,6 +2,23 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { z } from "zod";
+
+const CustomizationSchema = z.object({
+  name: z.string().max(100).optional(),
+  name_en: z.string().max(100).optional(),
+  description: z.string().max(2000).optional(),
+  description_en: z.string().max(2000).optional(),
+  primary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  secondary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  logo_url: z.string().url().nullable().optional(),
+  cover_image_url: z.string().url().nullable().optional(),
+  address: z.string().max(500).optional(),
+  phone: z.string().max(50).optional(),
+  website_url: z.string().url().nullable().optional(),
+  instagram_url: z.string().url().nullable().optional(),
+  twitter_url: z.string().url().nullable().optional(),
+});
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -16,7 +33,13 @@ export async function POST(request: NextRequest) {
 
   if (!store) return apiError("店舗が見つかりません", 404);
 
-  const body = await request.json();
+  let rawBody: unknown;
+  try { rawBody = await request.json(); } catch { return apiError("Invalid JSON", 400); }
+
+  const parsed = CustomizationSchema.safeParse(rawBody);
+  if (!parsed.success) return apiError(parsed.error.errors[0].message, 400);
+
+  const body = parsed.data;
 
   // まず全フィールド（description_en含む）で試みる
   const fullPayload = { store_id: store.id, ...body };

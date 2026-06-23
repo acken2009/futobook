@@ -5,6 +5,7 @@ import {
   handlePaymentIntentSucceeded,
   handleCustomerSubscriptionCreated,
   handleCustomerSubscriptionUpdated,
+  handleProductOrderCompleted,
 } from "@/lib/stripe/webhooks";
 
 export async function POST(request: NextRequest) {
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.deleted":
         await handleCustomerSubscriptionUpdated(event.data.object as any);
         break;
+      case "checkout.session.completed": {
+        const session = event.data.object as any;
+        if (session.metadata?.type === "product_order") {
+          await handleProductOrderCompleted(session);
+        }
+        break;
+      }
       default:
         console.warn(`Unhandled connect event: ${event.type}`);
     }

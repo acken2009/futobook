@@ -79,6 +79,7 @@ export default async function StorePage({ params, searchParams }: Props) {
   const t = {
     reserve: isEn ? "Book Now" : "予約する",
     subscribe: isEn ? "Subscribe" : "サブスク加入",
+    shop: isEn ? "Shop" : "ショップ",
     storeInfo: isEn ? "Store Info" : "店舗情報",
     address: isEn ? "Address" : "住所",
     phone: isEn ? "Phone" : "電話番号",
@@ -159,7 +160,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           {t.description && (
             <p className="text-lg opacity-90 max-w-xl mx-auto">{t.description}</p>
           )}
-          <div className="mt-2 flex gap-4 justify-center">
+          <div className="mt-2 flex flex-wrap gap-3 justify-center">
             <Link
               href={`/store/${slug}/reserve${isEn ? "?lang=en" : ""}`}
               className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
@@ -174,6 +175,12 @@ export default async function StorePage({ params, searchParams }: Props) {
                 {t.subscribe}
               </Link>
             )}
+            <Link
+              href={`/store/${slug}/shop`}
+              className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+            >
+              🛍️ {t.shop}
+            </Link>
           </div>
         </div>
       </header>

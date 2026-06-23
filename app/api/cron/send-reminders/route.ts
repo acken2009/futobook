@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { sendLineMessage } from "@/lib/line/send";
 import { reservationReminderEmail } from "@/lib/email/templates";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +10,14 @@ export const dynamic = "force-dynamic";
 // 予約の24時間前（±30分ウィンドウ）にリマインダーメールを送信
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const now = new Date();
-  // 深夜0時実行：翌日（0〜24時間後）の予約を全件対象
-  const windowStart = new Date(now.getTime() + 1 * 60 * 60 * 1000).toISOString(); // 1h後から
-  const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString(); // 25h後まで
+  // 毎時実行：24時間後±30分の予約を対象（重複防止のため reminder_sent_at IS NULL 条件を追加）
+  const windowStart = new Date(now.getTime() + 23.5 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(now.getTime() + 24.5 * 60 * 60 * 1000).toISOString();
 
   const { data: reservations, error } = await supabaseAdmin
     .from("reservations")
@@ -28,7 +29,8 @@ export async function GET(request: NextRequest) {
     `)
     .eq("status", "confirmed")
     .gte("reserved_at", windowStart)
-    .lte("reserved_at", windowEnd);
+    .lte("reserved_at", windowEnd)
+    .is("reminder_sent_at", null);
 
   if (error) {
     console.error("[cron] send-reminders query error:", error);
@@ -68,6 +70,29 @@ export async function GET(request: NextRequest) {
         storeId: store.id,
         type: "reservation_reminder",
       });
+
+      // 送信済みマーク（重複送信防止）
+      await supabaseAdmin
+        .from("reservations")
+        .update({ reminder_sent_at: now.toISOString() } as any)
+        .eq("id", reservation.id);
+
+      const { data: customerWithLine } = await supabaseAdmin
+        .from("customers")
+        .select("line_user_id")
+        .eq("email", customer.email)
+        .eq("store_id", store.id)
+        .single();
+      const lineUserId = (customerWithLine as any)?.line_user_id;
+      if (lineUserId) {
+        const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
+          month: "long", day: "numeric", weekday: "short",
+          hour: "2-digit", minute: "2-digit",
+        });
+        const lineMsg = `⏰ 予約リマインダー\n明日 ${dateStr}\n${store.name}${service?.name ? `\n${service.name}` : ""}${cancelUrl ? `\n\nキャンセルはこちら:\n${cancelUrl}` : ""}`;
+        await sendLineMessage({ lineUserId, message: lineMsg, storeId: store.id });
+      }
+
       sent++;
     } catch (e) {
       console.error(`[cron] send-reminders failed for reservation ${reservation.id}:`, e);

@@ -59,6 +59,118 @@ export default function HomePage() {
           ))}
         </div>
 
+        {/* 料金プラン */}
+        <div className="mt-20">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">料金プラン</h2>
+          <p className="text-center text-gray-500 mb-10">すべてのプランで初期費用・解約金なし。いつでも変更可能です。</p>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* スターター */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-7 flex flex-col">
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">スターター</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-extrabold text-gray-900">¥0</span>
+                  <span className="text-gray-500">/月</span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">まず試してみたい方に</p>
+              </div>
+              <ul className="space-y-2 text-sm text-gray-600 flex-1 mb-6">
+                {["オンライン予約（月30件まで）", "サービスメニュー3件まで", "メール通知", "店舗ページ公開"].map(f => (
+                  <li key={f} className="flex items-center gap-2">
+                    <span className="text-green-500 font-bold">✓</span>{f}
+                  </li>
+                ))}
+                <li className="flex items-center gap-2 pt-1 border-t border-gray-100 text-gray-400">
+                  <span className="text-orange-400 font-bold text-xs">%</span>取引マージン 5%
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block text-center bg-gray-100 text-gray-800 px-6 py-2.5 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+              >
+                無料で始める
+              </Link>
+            </div>
+
+            {/* ベーシック（おすすめ） */}
+            <div className="bg-blue-600 rounded-2xl p-7 flex flex-col text-white relative">
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full">
+                おすすめ
+              </span>
+              <div className="mb-4">
+                <p className="text-sm font-medium text-blue-200 uppercase tracking-wide">ベーシック</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-extrabold">¥4,480</span>
+                  <span className="text-blue-200">/月</span>
+                </div>
+                <p className="text-sm text-blue-200 mt-1">本格運用を始めたい方に</p>
+              </div>
+              <ul className="space-y-2 text-sm flex-1 mb-6">
+                {[
+                  "オンライン予約（無制限）",
+                  "サービスメニュー無制限",
+                  "クレジットカード決済",
+                  "サブスクリプション販売",
+                  "物販（商品販売機能）",
+                  "LINE通知連携",
+                  "キャンセルリマインダー",
+                ].map(f => (
+                  <li key={f} className="flex items-center gap-2">
+                    <span className="text-blue-200 font-bold">✓</span>{f}
+                  </li>
+                ))}
+                <li className="flex items-center gap-2 pt-1 border-t border-blue-500 text-blue-200">
+                  <span className="font-bold text-xs">%</span>取引マージン 3%
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block text-center bg-white text-blue-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+              >
+                無料で始める
+              </Link>
+            </div>
+
+            {/* スタンダード */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-7 flex flex-col">
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">スタンダード</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-extrabold text-gray-900">¥9,800</span>
+                  <span className="text-gray-500">/月</span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">複数スタッフで運営する方に</p>
+              </div>
+              <ul className="space-y-2 text-sm text-gray-600 flex-1 mb-6">
+                {[
+                  "ベーシックの全機能",
+                  "複数スタッフ管理",
+                  "スタッフ別スケジュール",
+                  "顧客カルテ",
+                  "優先サポート（メール）",
+                  "カスタムドメイン（近日公開）",
+                ].map(f => (
+                  <li key={f} className="flex items-center gap-2">
+                    <span className="text-green-500 font-bold">✓</span>{f}
+                  </li>
+                ))}
+                <li className="flex items-center gap-2 pt-1 border-t border-gray-100 text-gray-400">
+                  <span className="text-green-400 font-bold text-xs">%</span>取引マージン 1%
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block text-center bg-gray-800 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-gray-900 transition-colors"
+              >
+                無料で始める
+              </Link>
+            </div>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-6">
+            ※ ベーシック・スタンダードは現在ベータリリース中につき、当面は全機能を無料でご利用いただけます。
+          </p>
+        </div>
+
         {/* CTA */}
         <div className="text-center mt-16">
           <p className="text-gray-500 mb-4">
@@ -69,6 +181,14 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+
+      {/* フッター */}
+      <footer className="border-t border-gray-200 mt-20 py-8 text-center text-xs text-gray-400 space-x-4">
+        <Link href="/tokutei" className="hover:underline">特定商取引法に基づく表記</Link>
+        <Link href="/privacy" className="hover:underline">プライバシーポリシー</Link>
+        <Link href="/terms" className="hover:underline">利用規約</Link>
+        <span>© 2026 Futobook</span>
+      </footer>
     </main>
   );
 }

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { stripe } from "@/lib/stripe/client";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
+import { sendLineMessage } from "@/lib/line/send";
 import { reservationCancellationEmail } from "@/lib/email/templates";
 import { calcRefundAmount } from "@/lib/stripe/refund";
 import { z } from "zod";
@@ -130,7 +131,27 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ② 店舗オーナーへキャンセル通知
+  // ② 顧客へLINEキャンセル通知
+  if (customer?.email && store) {
+    const { data: customerWithLine } = await supabaseAdmin
+      .from("customers")
+      .select("line_user_id")
+      .eq("email", customer.email)
+      .eq("store_id", store.id)
+      .single();
+    const lineUserId = (customerWithLine as any)?.line_user_id;
+    if (lineUserId) {
+      const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
+        month: "long", day: "numeric", weekday: "short",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const refundText = refundAmount > 0 ? `\n返金額：¥${refundAmount.toLocaleString()}（${refundPct}%）` : "";
+      const lineMsg = `❌ 予約キャンセル完了\n${store.name}\n${dateStr}${refundText}`;
+      await sendLineMessage({ lineUserId, message: lineMsg, storeId: store.id });
+    }
+  }
+
+  // ③ 店舗オーナーへキャンセル通知
   if (store?.owner_id) {
     const { data: ownerUser } = await supabaseAdmin.auth.admin.getUserById(
       store.owner_id

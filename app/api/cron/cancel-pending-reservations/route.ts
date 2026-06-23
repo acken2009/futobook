@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export async function GET(request: NextRequest) {
   // Cronジョブの認証（CRON_SECRET で保護）
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { StoreCustomization } from "@/types/database";
 import { MediaUploader } from "./media-uploader";
 
@@ -63,6 +63,51 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
     instagram_url: customization?.instagram_url ?? "",
     twitter_url: customization?.twitter_url ?? "",
   });
+
+  const [lineToken, setLineToken] = useState("");
+  const [lineSecret, setLineSecret] = useState("");
+  const [lineConfigured, setLineConfigured] = useState(false);
+  const [lineSaving, setLineSaving] = useState(false);
+  const [lineSaved, setLineSaved] = useState(false);
+  const [lineError, setLineError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/line-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.configured) setLineConfigured(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleLineSave(e: React.FormEvent) {
+    e.preventDefault();
+    setLineSaving(true);
+    setLineError(null);
+    try {
+      const res = await fetch("/api/line-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          line_channel_access_token: lineToken || null,
+          line_channel_secret: lineSecret || null,
+        }),
+      });
+      if (res.ok) {
+        setLineSaved(true);
+        setLineConfigured(!!(lineToken || lineSecret));
+        setLineToken("");
+        setLineSecret("");
+      } else {
+        const d = await res.json();
+        setLineError(d.error ?? "保存に失敗しました");
+      }
+    } catch {
+      setLineError("ネットワークエラーが発生しました");
+    } finally {
+      setLineSaving(false);
+    }
+  }
 
   function update(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -333,6 +378,58 @@ export function CustomizationForm({ storeId, customization, initialImages = [] }
           coverUrl={(customization as any)?.cover_image_url}
           initialImages={initialImages}
         />
+      </section>
+
+      {/* LINE通知設定 */}
+      <section className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="font-semibold">LINE通知設定</h2>
+          {lineConfigured && (
+            <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">設定済み</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          LINE公式アカウントのチャネルアクセストークンとチャネルシークレットを設定すると、予約確認・リマインダー・キャンセルをLINEで通知できます。
+          Webhook URL: <code className="bg-gray-100 px-1 rounded">{`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/webhooks/line?store_id=${storeId}`}</code>
+        </p>
+        <form onSubmit={handleLineSave} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              チャネルアクセストークン
+            </label>
+            <input
+              type="password"
+              value={lineToken}
+              onChange={(e) => { setLineToken(e.target.value); setLineSaved(false); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder={lineConfigured ? "変更する場合は新しいトークンを入力" : "チャネルアクセストークンを入力"}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              チャネルシークレット
+            </label>
+            <input
+              type="password"
+              value={lineSecret}
+              onChange={(e) => { setLineSecret(e.target.value); setLineSaved(false); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder={lineConfigured ? "変更する場合は新しいシークレットを入力" : "チャネルシークレットを入力"}
+            />
+          </div>
+          {lineError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+              ❌ {lineError}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={lineSaving || (!lineToken && !lineSecret)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            {lineSaving ? "保存中..." : lineSaved ? "✓ 保存しました" : "LINE設定を保存"}
+          </button>
+        </form>
       </section>
 
       {saveError && (

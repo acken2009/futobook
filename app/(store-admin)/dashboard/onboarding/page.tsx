@@ -16,13 +16,19 @@ export default function OnboardingPage() {
 
   function handleNameChange(value: string) {
     setName(value);
-    // 店舗名からスラッグを自動生成
     const autoSlug = value
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
       .slice(0, 50);
-    setSlug(autoSlug);
+    // 日本語店舗名など英数字が残らない場合はタイムスタンプベースのスラッグを生成
+    if (autoSlug.length >= 3) {
+      setSlug(autoSlug);
+    } else if (value.trim().length > 0) {
+      setSlug("store-" + Date.now().toString(36));
+    } else {
+      setSlug("");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

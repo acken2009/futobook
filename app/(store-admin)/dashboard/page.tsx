@@ -63,6 +63,43 @@ export default async function DashboardPage() {
     .eq("store_id", store.id)
     .eq("status", "active");
 
+  // セットアップチェック
+  const { count: serviceItemCount } = await supabase
+    .from("service_items")
+    .select("*", { count: "exact", head: true })
+    .eq("store_id", store.id);
+
+  const { count: availabilityCount } = await supabase
+    .from("availability_schedules")
+    .select("*", { count: "exact", head: true })
+    .eq("store_id", store.id);
+
+  const setupItems = [
+    {
+      label: "サービスメニューを登録する",
+      done: (serviceItemCount ?? 0) > 0,
+      href: "/dashboard/services",
+    },
+    {
+      label: "営業時間・予約枠を設定する",
+      done: (availabilityCount ?? 0) > 0,
+      href: "/dashboard/availability",
+    },
+    {
+      label: "Stripeで決済を有効にする",
+      done: store.stripe_account_status === "active",
+      href: "/dashboard/billing",
+    },
+    {
+      label: "店舗ページを確認する",
+      done: true,
+      href: `/store/${store.slug}`,
+      external: true,
+    },
+  ];
+  const setupDone = setupItems.filter((i) => i.done).length;
+  const allSetupDone = setupDone === setupItems.length;
+
   const stats = [
     { label: "今月の売上", value: formatCurrency(monthlyRevenue), icon: "💰" },
     { label: "今月の予約", value: `${monthlyReservations ?? 0}件`, icon: "📅" },
@@ -113,6 +150,47 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* セットアップチェックリスト（完了済みなら非表示） */}
+      {!allSetupDone && (
+        <div className="bg-white rounded-xl border border-blue-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">スタートアップガイド</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {setupDone}/{setupItems.length} ステップ完了
+              </p>
+            </div>
+            <div className="w-24 bg-gray-100 rounded-full h-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all"
+                style={{ width: `${(setupDone / setupItems.length) * 100}%` }}
+              />
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {setupItems.map((item) => (
+              <li key={item.label}>
+                {item.done ? (
+                  <span className="flex items-center gap-3 text-sm text-gray-400">
+                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs flex-shrink-0">✓</span>
+                    <span className="line-through">{item.label}</span>
+                  </span>
+                ) : (
+                  <Link
+                    href={item.href}
+                    target={(item as any).external ? "_blank" : undefined}
+                    className="flex items-center gap-3 text-sm text-blue-600 hover:underline"
+                  >
+                    <span className="w-5 h-5 rounded-full border-2 border-blue-300 flex items-center justify-center flex-shrink-0" />
+                    {item.label}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 直近の予約 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

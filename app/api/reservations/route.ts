@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
+import { sendLineMessage } from "@/lib/line/send";
 import { reservationConfirmationEmail, reservationNotificationEmail } from "@/lib/email/templates";
 import { reservationRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -163,7 +164,24 @@ export async function POST(request: NextRequest) {
       type: "reservation_confirmation",
     });
 
-    // ② 店舗オーナーへの通知メール
+    // ② 顧客へLINE通知
+    const { data: customerWithLine } = await supabaseAdmin
+      .from("customers")
+      .select("line_user_id")
+      .eq("id", customerId)
+      .single();
+    const lineUserId = (customerWithLine as any)?.line_user_id;
+    if (lineUserId) {
+      const reservedAtDate = new Date(reserved_at);
+      const dateStr = reservedAtDate.toLocaleString("ja-JP", {
+        month: "long", day: "numeric", weekday: "short",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const lineMsg = `✅ 予約確定！\n${store.name}\n${dateStr}${serviceName ? `\n${serviceName}` : ""}\n\nキャンセルはこちら:\n${cancelUrl}`;
+      await sendLineMessage({ lineUserId, message: lineMsg, storeId: store_id });
+    }
+
+    // ③ 店舗オーナーへの通知メール
     if (store.owner_id) {
       const { data: ownerUser } = await supabaseAdmin.auth.admin.getUserById(store.owner_id);
       if (ownerUser?.user?.email) {
@@ -197,6 +215,20 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const storeId = searchParams.get("store_id");
   if (!storeId) return apiError("store_id が必要です", 400);
+
+  // オーナー認証：リクエストユーザーがこの店舗のオーナーか確認
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return apiError("Unauthorized", 401);
+
+  const { data: store } = await supabaseAdmin
+    .from("stores")
+    .select("id")
+    .eq("id", storeId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!store) return apiError("Forbidden", 403);
 
   const { data, error } = await supabaseAdmin
     .from("reservations")

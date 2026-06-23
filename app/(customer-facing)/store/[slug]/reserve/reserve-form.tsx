@@ -51,6 +51,7 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [policyAgreed, setPolicyAgreed] = useState(false);
 
   const slotMinutes = settings?.slot_duration_minutes ?? 60;
   const advanceDays = settings?.advance_booking_days ?? 30;
@@ -90,6 +91,11 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
     backToStore: isEn ? "Back to Store" : "店舗ページに戻る",
     errorDefault: isEn ? "Booking failed. Please try again." : "予約に失敗しました",
     errorCheckout: isEn ? "Failed to redirect to payment. Please try again." : "決済画面への移動に失敗しました。もう一度お試しください。",
+    cancelPolicy: isEn ? "Cancellation Policy" : "キャンセルポリシー",
+    cancelPolicy24h: isEn ? "24+ hours before: Full refund" : "予約24時間以上前：全額返金",
+    cancelPolicy2to24h: isEn ? "2–24 hours before: 50% refund" : "予約2〜24時間前：50%返金",
+    cancelPolicyUnder2h: isEn ? "Within 2 hours: No refund" : "予約2時間以内：キャンセル・返金不可",
+    cancelPolicyAgree: isEn ? "I have read and agree to the cancellation policy" : "キャンセルポリシーを確認し、同意します",
   };
 
   const availableDates = Array.from({ length: advanceDays }, (_, i) =>
@@ -433,9 +439,39 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
             )}
           </div>
 
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 text-sm">
+            <p className="font-semibold text-gray-800 mb-2">📋 {t.cancelPolicy}</p>
+            <ul className="space-y-1 text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 font-bold mt-px">✓</span>
+                <span>{t.cancelPolicy24h}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-yellow-500 font-bold mt-px">!</span>
+                <span>{t.cancelPolicy2to24h}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-500 font-bold mt-px">✕</span>
+                <span className="font-medium">{t.cancelPolicyUnder2h}</span>
+              </li>
+            </ul>
+          </div>
+
+          <label className="flex items-center gap-3 mb-4 cursor-pointer">
+            <input
+              type="checkbox"
+              required
+              checked={policyAgreed}
+              onChange={(e) => setPolicyAgreed(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+              style={{ accentColor: primaryColor }}
+            />
+            <span className="text-sm text-gray-700">{t.cancelPolicyAgree}</span>
+          </label>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !policyAgreed}
             className="w-full py-3 rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: primaryColor }}
           >

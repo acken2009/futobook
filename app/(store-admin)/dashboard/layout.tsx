@@ -4,6 +4,7 @@ import { getLang } from "@/lib/lang";
 import Link from "next/link";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 import { LangToggle } from "@/components/dashboard/lang-toggle";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
 
 export default async function DashboardLayout({
   children,
@@ -19,7 +20,6 @@ export default async function DashboardLayout({
 
   const lang = await getLang();
 
-  // ユーザーの店舗を取得
   const { data: stores } = await supabase
     .from("stores")
     .select("id, name, slug")
@@ -34,6 +34,8 @@ export default async function DashboardLayout({
         { href: "/dashboard/reservations", label: "Reservations", icon: "📋" },
         { href: "/dashboard/customers", label: "Customers", icon: "👥" },
         { href: "/dashboard/subscriptions", label: "Subscriptions", icon: "🔄" },
+        { href: "/dashboard/products", label: "Products", icon: "🛍️" },
+        { href: "/dashboard/orders", label: "Orders", icon: "📦" },
         { href: "/dashboard/analytics", label: "Analytics", icon: "📈" },
         { href: "/dashboard/billing", label: "Plan & Billing", icon: "💳" },
       ]
@@ -45,26 +47,38 @@ export default async function DashboardLayout({
         { href: "/dashboard/reservations", label: "予約管理", icon: "📋" },
         { href: "/dashboard/customers", label: "顧客管理", icon: "👥" },
         { href: "/dashboard/subscriptions", label: "サブスクプラン", icon: "🔄" },
+        { href: "/dashboard/products", label: "商品管理", icon: "🛍️" },
+        { href: "/dashboard/orders", label: "注文管理", icon: "📦" },
         { href: "/dashboard/analytics", label: "アナリティクス", icon: "📈" },
         { href: "/dashboard/billing", label: "プラン・請求", icon: "💳" },
       ];
 
+  const storeName = stores?.[0]?.name;
+  const storeSlug = stores?.[0]?.slug;
+
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* サイドバー */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      {/* モバイルナビ（ハンバーガー + ドロワー） */}
+      <MobileNav
+        navItems={navItems}
+        storeName={storeName}
+        storeSlug={storeSlug}
+        userEmail={user.email}
+        lang={lang}
+      />
+
+      {/* PCサイドバー（md以上で表示） */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col shrink-0">
         <div className="p-6 border-b border-gray-200">
           <Link href="/" className="text-xl font-bold text-blue-600">
             Futobook
           </Link>
-          {stores && stores.length > 0 && (
-            <p className="text-sm text-gray-500 mt-1 truncate">
-              {stores[0].name}
-            </p>
+          {storeName && (
+            <p className="text-sm text-gray-500 mt-1 truncate">{storeName}</p>
           )}
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -78,9 +92,9 @@ export default async function DashboardLayout({
         </nav>
 
         <div className="p-4 border-t border-gray-200 space-y-2">
-          {stores && stores.length > 0 && (
+          {storeSlug && (
             <Link
-              href={`/store/${stores[0].slug}`}
+              href={`/store/${storeSlug}`}
               target="_blank"
               className="block text-center text-sm text-blue-600 hover:underline"
             >
@@ -94,7 +108,7 @@ export default async function DashboardLayout({
       </aside>
 
       {/* メインコンテンツ */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pt-14 md:pt-0">
         {children}
       </main>
     </div>

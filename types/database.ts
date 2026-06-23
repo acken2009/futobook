@@ -32,8 +32,10 @@ export type SubscriptionStatus =
 export type PaymentType =
   | "reservation"
   | "subscription"
+  | "product"
   | "platform_fee"
   | "refund";
+export type OrderStatus = "pending" | "paid" | "cancelled";
 export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded";
 
 // ---------- Tables ----------
@@ -56,6 +58,8 @@ export interface Store {
   stripe_account_status: ConnectAccountStatus;
   platform_subscription_id: string | null; // Stripeサブスクリプションid
   platform_plan_id: string | null;
+  line_channel_access_token: string | null;
+  line_channel_secret: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -133,6 +137,7 @@ export interface Customer {
   name: string;
   phone: string | null;
   stripe_customer_id: string | null;
+  line_user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -226,6 +231,46 @@ export interface WebhookEvent {
   stripe_event_id: string; // UNIQUE
   type: string;
   processed_at: string;
+  created_at: string;
+}
+
+export interface Product {
+  id: string;
+  store_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  stock_quantity: number | null;
+  image_url: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Order {
+  id: string;
+  store_id: string;
+  customer_id: string | null;
+  customer_name: string;
+  customer_email: string;
+  status: OrderStatus;
+  total_amount: number;
+  platform_fee: number;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
   created_at: string;
 }
 
