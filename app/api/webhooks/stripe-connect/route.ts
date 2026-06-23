@@ -7,6 +7,7 @@ import {
   handleCustomerSubscriptionUpdated,
   handleProductOrderCompleted,
 } from "@/lib/stripe/webhooks";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -60,6 +61,17 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as any;
         if (session.metadata?.type === "product_order") {
           await handleProductOrderCompleted(session);
+        }
+        break;
+      }
+      case "checkout.session.expired": {
+        const expired = event.data.object as any;
+        if (expired.metadata?.type === "product_order" && expired.metadata?.order_id) {
+          await supabaseAdmin
+            .from("orders")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", expired.metadata.order_id)
+            .eq("status", "pending");
         }
         break;
       }

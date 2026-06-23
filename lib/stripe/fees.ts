@@ -22,5 +22,7 @@ export function calculatePlatformFee(amount: number, feePct: number): number {
  * @returns application_fee_percent に渡す整数パーセント（例: 5）
  */
 export function calculateSubscriptionFeePercent(feePct: number): number {
-  return Math.round(feePct * 100);
+  // Stripeはapplication_fee_percentに小数2桁まで対応（例: 3.5）
+  // Math.roundで整数化すると誤差が出るため、小数のまま返す
+  return feePct * 100;
 }

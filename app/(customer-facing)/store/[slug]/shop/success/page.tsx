@@ -25,6 +25,7 @@ export default async function ShopSuccessPage({
       .select("*, order_items(product_name, quantity, unit_price)")
       .eq("id", order_id)
       .eq("store_id", storeRow.id)
+      .eq("status", "paid")
       .single();
     order = data;
   }

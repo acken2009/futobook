@@ -69,9 +69,14 @@ export async function PATCH(
 
     if (!reservation) return apiError("予約が見つかりません", 404);
 
+    // 日時変更時は cancel_token_expires_at も同時更新（予約2時間前が期限）
+    const newCancelTokenExpiry = new Date(
+      new Date(newReservedAt).getTime() - 2 * 60 * 60 * 1000
+    ).toISOString();
+
     const { error } = await supabaseAdmin
       .from("reservations")
-      .update({ reserved_at: newReservedAt })
+      .update({ reserved_at: newReservedAt, cancel_token_expires_at: newCancelTokenExpiry })
       .eq("id", id)
       .eq("store_id", store.id);
 

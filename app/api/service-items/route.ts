@@ -23,8 +23,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("service_items")
-    .select("*")
+    .select("id, name, name_en, description, description_en, price, duration_minutes, sort_order")
     .eq("store_id", storeId)
+    .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 

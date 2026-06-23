@@ -24,6 +24,16 @@ export interface SubscriptionEmailData {
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com";
 
+function escapeHtml(str: string | undefined | null): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function baseTemplate(content: string, title: string, lang: "ja" | "en" = "ja"): string {
   return `
 <!DOCTYPE html>
@@ -156,7 +166,7 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
         </tr>
         ${data.notes ? `<tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">備考</td>
-          <td style="font-size: 14px; padding: 4px 0;">${data.notes}</td>
+          <td style="font-size: 14px; padding: 4px 0;">${escapeHtml(data.notes)}</td>
         </tr>` : ""}
       </table>
     </div>
@@ -166,15 +176,15 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">お名前</td>
-          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.customerName} 様</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${escapeHtml(data.customerName)} 様</td>
         </tr>
         <tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">メール</td>
-          <td style="font-size: 14px; padding: 4px 0;"><a href="mailto:${data.customerEmail}" style="color: #3B82F6;">${data.customerEmail}</a></td>
+          <td style="font-size: 14px; padding: 4px 0;"><a href="mailto:${escapeHtml(data.customerEmail)}" style="color: #3B82F6;">${escapeHtml(data.customerEmail)}</a></td>
         </tr>
         ${data.customerPhone ? `<tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">電話</td>
-          <td style="font-size: 14px; padding: 4px 0;"><a href="tel:${data.customerPhone}" style="color: #3B82F6;">${data.customerPhone}</a></td>
+          <td style="font-size: 14px; padding: 4px 0;"><a href="tel:${escapeHtml(data.customerPhone)}" style="color: #3B82F6;">${escapeHtml(data.customerPhone)}</a></td>
         </tr>` : ""}
       </table>
     </div>

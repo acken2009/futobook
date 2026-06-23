@@ -182,10 +182,12 @@ export async function handlePaymentIntentSucceeded(
   }
 
   if (metadata?.reservation_id) {
+    // Cronによるキャンセル済み予約を誤ってconfirmedに戻さないようガード
     await supabaseAdmin
       .from("reservations")
       .update({ status: "confirmed" })
-      .eq("id", metadata.reservation_id);
+      .eq("id", metadata.reservation_id)
+      .neq("status", "cancelled");
 
     // 予約確認メール
     const { data: reservation } = await supabaseAdmin
@@ -263,7 +265,7 @@ export async function handleCustomerSubscriptionCreated(
 ): Promise<void> {
   const { store_id, plan_id, customer_email, customer_name } =
     subscription.metadata;
-  if (!store_id || !plan_id) return;
+  if (!store_id || !plan_id || !customer_email) return;
 
   // 顧客を検索または作成
   let customerId: string;
@@ -277,7 +279,7 @@ export async function handleCustomerSubscriptionCreated(
   if (existingCustomer) {
     customerId = existingCustomer.id;
   } else {
-    const { data: newCustomer } = await supabaseAdmin
+    const { data: newCustomer, error: insertErr } = await supabaseAdmin
       .from("customers")
       .insert({
         store_id,
@@ -287,11 +289,15 @@ export async function handleCustomerSubscriptionCreated(
       })
       .select("id")
       .single();
-    customerId = newCustomer!.id;
+    if (insertErr || !newCustomer) {
+      console.error("handleCustomerSubscriptionCreated: customer insert failed", insertErr);
+      return;
+    }
+    customerId = newCustomer.id;
   }
 
-  // customer_subscriptions に記録
-  await supabaseAdmin.from("customer_subscriptions").insert({
+  // customer_subscriptions に記録（冪等性: stripe_subscription_idで upsert）
+  await supabaseAdmin.from("customer_subscriptions").upsert({
     store_id,
     customer_id: customerId,
     plan_id,
@@ -303,7 +309,7 @@ export async function handleCustomerSubscriptionCreated(
     current_period_end: new Date(
       subscription.current_period_end * 1000
     ).toISOString(),
-  });
+  }, { onConflict: "stripe_subscription_id" });
 
   // サブスク加入確認メール
   const { data: plan } = await supabaseAdmin
@@ -369,7 +375,7 @@ export async function handleProductOrderCompleted(
   const { order_id, store_id } = session.metadata ?? {};
   if (!order_id || !store_id) return;
 
-  // 注文をpaid状態に更新
+  // 注文をpaid状態に更新（store_idで自店舗の注文のみ対象）
   await supabaseAdmin
     .from("orders")
     .update({
@@ -377,7 +383,8 @@ export async function handleProductOrderCompleted(
       stripe_payment_intent_id: session.payment_intent as string,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", order_id);
+    .eq("id", order_id)
+    .eq("store_id", store_id);
 
   // 在庫を減らす
   const { data: items } = await supabaseAdmin

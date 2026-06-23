@@ -2,6 +2,12 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { z } from "zod";
+
+const LineSettingsSchema = z.object({
+  line_channel_access_token: z.string().min(1).max(500),
+  line_channel_secret: z.string().min(1).max(100),
+});
 
 export async function GET() {
   const supabase = await createClient();
@@ -22,7 +28,7 @@ export async function GET() {
   return Response.json({
     line_channel_access_token: mask((store as any).line_channel_access_token),
     line_channel_secret: mask((store as any).line_channel_secret),
-    configured: !!(store as any).line_channel_access_token,
+    configured: !!(store as any).line_channel_access_token && !!(store as any).line_channel_secret,
   });
 }
 
@@ -39,14 +45,19 @@ export async function POST(request: NextRequest) {
 
   if (!store) return apiError("店舗が見つかりません", 404);
 
-  const body = await request.json();
-  const { line_channel_access_token, line_channel_secret } = body;
+  let rawBody: unknown;
+  try { rawBody = await request.json(); } catch { return apiError("Invalid JSON", 400); }
+
+  const parsed = LineSettingsSchema.safeParse(rawBody);
+  if (!parsed.success) return apiError(parsed.error.errors[0].message, 400);
+
+  const { line_channel_access_token, line_channel_secret } = parsed.data;
 
   const { error } = await supabaseAdmin
     .from("stores")
     .update({
-      line_channel_access_token: line_channel_access_token || null,
-      line_channel_secret: line_channel_secret || null,
+      line_channel_access_token,
+      line_channel_secret,
     } as any)
     .eq("id", store.id);
 

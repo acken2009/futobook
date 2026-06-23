@@ -10,7 +10,7 @@ import { apiError } from "@/lib/utils";
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.ADMIN_SECRET}`) {
+  if (!process.env.ADMIN_SECRET || authHeader !== `Bearer ${process.env.ADMIN_SECRET}`) {
     return apiError("Unauthorized", 401);
   }
 

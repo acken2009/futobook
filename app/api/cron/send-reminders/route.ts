@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         type: "reservation_reminder",
       });
 
-      // 送信済みマーク（重複送信防止）
+      // メール送信成功後に即マーク（LINE失敗でも再送しない）
       await supabaseAdmin
         .from("reservations")
         .update({ reminder_sent_at: now.toISOString() } as any)
@@ -88,9 +88,14 @@ export async function GET(request: NextRequest) {
         const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
           month: "long", day: "numeric", weekday: "short",
           hour: "2-digit", minute: "2-digit",
+          timeZone: "Asia/Tokyo",
         });
         const lineMsg = `⏰ 予約リマインダー\n明日 ${dateStr}\n${store.name}${service?.name ? `\n${service.name}` : ""}${cancelUrl ? `\n\nキャンセルはこちら:\n${cancelUrl}` : ""}`;
-        await sendLineMessage({ lineUserId, message: lineMsg, storeId: store.id });
+        try {
+          await sendLineMessage({ lineUserId, message: lineMsg, storeId: store.id });
+        } catch (lineErr) {
+          console.error(`[cron] send-reminders LINE failed for reservation ${reservation.id}:`, lineErr);
+        }
       }
 
       sent++;
