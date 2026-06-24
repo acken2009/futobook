@@ -72,70 +72,74 @@ export async function POST(request: NextRequest) {
     }
 
     if (event.type === "message" && event.message?.type === "text") {
-      const text: string = event.message.text.trim();
+      try {
+        const text: string = event.message.text.trim();
 
-      // メールアドレスの場合、customersテーブルのline_user_idを更新
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
-        const { data: customer } = await supabaseAdmin
-          .from("customers")
-          .select("id, line_user_id")
-          .eq("store_id", storeId)
-          .eq("email", text)
-          .single();
+        // メールアドレスの場合、customersテーブルのline_user_idを更新
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+          const { data: customer } = await supabaseAdmin
+            .from("customers")
+            .select("id, line_user_id")
+            .eq("store_id", storeId)
+            .eq("email", text)
+            .single();
 
-        const accessToken = (store as any)?.line_channel_access_token ?? "";
+          const accessToken = (store as any)?.line_channel_access_token ?? "";
 
-        if (customer) {
-          // 既にリンク済みの場合は別ユーザーによる乗っ取りを防ぐため更新しない
-          if (!(customer as any).line_user_id) {
-            await supabaseAdmin
-              .from("customers")
-              .update({ line_user_id: lineUserId } as any)
-              .eq("id", customer.id);
-          }
+          if (customer) {
+            // 既にリンク済みの場合は別ユーザーによる乗っ取りを防ぐため更新しない
+            if (!(customer as any).line_user_id) {
+              await supabaseAdmin
+                .from("customers")
+                .update({ line_user_id: lineUserId } as any)
+                .eq("id", customer.id);
+            }
 
-          try {
-            await fetch("https://api.line.me/v2/bot/message/reply", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-              },
-              body: JSON.stringify({
-                replyToken: event.replyToken,
-                messages: [
-                  {
-                    type: "text",
-                    text: "連携完了しました！予約の確認・リマインダー・キャンセル通知をLINEでお知らせします。",
-                  },
-                ],
-              }),
-            });
-          } catch (e) {
-            console.error("[LINE webhook] reply error:", e);
-          }
-        } else {
-          try {
-            await fetch("https://api.line.me/v2/bot/message/reply", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-              },
-              body: JSON.stringify({
-                replyToken: event.replyToken,
-                messages: [
-                  {
-                    type: "text",
-                    text: "該当するお客様情報が見つかりませんでした。ご予約時のメールアドレスをご確認ください。",
-                  },
-                ],
-              }),
-            });
-          } catch (e) {
-            console.error("[LINE webhook] reply error:", e);
+            try {
+              await fetch("https://api.line.me/v2/bot/message/reply", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  replyToken: event.replyToken,
+                  messages: [
+                    {
+                      type: "text",
+                      text: "連携完了しました！予約の確認・リマインダー・キャンセル通知をLINEでお知らせします。",
+                    },
+                  ],
+                }),
+              });
+            } catch (e) {
+              console.error("[LINE webhook] reply error:", e);
+            }
+          } else {
+            try {
+              await fetch("https://api.line.me/v2/bot/message/reply", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  replyToken: event.replyToken,
+                  messages: [
+                    {
+                      type: "text",
+                      text: "該当するお客様情報が見つかりませんでした。ご予約時のメールアドレスをご確認ください。",
+                    },
+                  ],
+                }),
+              });
+            } catch (e) {
+              console.error("[LINE webhook] reply error:", e);
+            }
           }
         }
+      } catch (e) {
+        console.error("[LINE webhook] message handler error:", e);
       }
     }
   }

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const { data: reservation } = await supabaseAdmin
     .from("reservations")
     .select(`
-      id, status, cancel_token_expires_at, reserved_at, party_size,
+      id, status, cancel_token_expires_at, reserved_at, party_size, customer_id,
       customers(name, email),
       service_items(name),
       stores(id, name, slug, owner_id, stripe_account_id)
@@ -132,12 +132,11 @@ export async function POST(request: NextRequest) {
   }
 
   // ② 顧客へLINEキャンセル通知
-  if (customer?.email && store) {
+  if (store && reservation.customer_id) {
     const { data: customerWithLine } = await supabaseAdmin
       .from("customers")
       .select("line_user_id")
-      .eq("email", customer.email)
-      .eq("store_id", store.id)
+      .eq("id", reservation.customer_id)
       .single();
     const lineUserId = (customerWithLine as any)?.line_user_id;
     if (lineUserId) {

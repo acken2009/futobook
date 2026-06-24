@@ -26,12 +26,21 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return apiError("Unauthorized", 401);
 
+  // まず予約のstore_idを取得し、それがログインユーザーの店舗か確認（複数店舗オーナー対応）
+  const { data: reservationInfo } = await supabaseAdmin
+    .from("reservations")
+    .select("store_id")
+    .eq("id", id)
+    .single();
+  if (!reservationInfo) return apiError("予約が見つかりません", 404);
+
   const { data: store } = await supabaseAdmin
     .from("stores")
     .select("id, name, slug")
+    .eq("id", reservationInfo.store_id)
     .eq("owner_id", user.id)
     .single();
-  if (!store) return apiError("店舗が見つかりません", 404);
+  if (!store) return apiError("Forbidden", 403);
 
   let body: unknown;
   try { body = await request.json(); } catch { return apiError("Invalid JSON", 400); }

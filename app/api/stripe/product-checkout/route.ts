@@ -88,8 +88,23 @@ export async function POST(request: NextRequest) {
       .insert({ store_id, email: customer.email, name: customer.name })
       .select("id")
       .single();
-    if (customerError || !newCustomer) return apiError("顧客情報の保存に失敗しました", 500);
-    customerId = newCustomer.id;
+    if (customerError) {
+      // UNIQUE制約違反（同時リクエストによる競合）の場合は既存レコードを再取得
+      if (customerError.code === "23505") {
+        const { data: retryCustomer } = await supabaseAdmin
+          .from("customers")
+          .select("id")
+          .eq("store_id", store_id)
+          .eq("email", customer.email)
+          .single();
+        if (!retryCustomer) return apiError("顧客情報の取得に失敗しました", 500);
+        customerId = retryCustomer.id;
+      } else {
+        return apiError("顧客情報の保存に失敗しました", 500);
+      }
+    } else {
+      customerId = newCustomer?.id ?? null;
+    }
   }
 
   // pending注文を先に作成

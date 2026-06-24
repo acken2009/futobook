@@ -25,15 +25,6 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
       subject,
       html,
     });
-
-    // 送信ログ記録
-    await supabaseAdmin.from("notification_log").insert({
-      store_id: storeId ?? null,
-      recipient_email: to,
-      type,
-      subject,
-      status: "sent",
-    });
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
 
@@ -50,5 +41,19 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     } catch (logErr) {
       console.error("Failed to write email failure log:", logErr);
     }
+    return;
+  }
+
+  // 送信成功ログ記録（送信とは独立したtry/catch）
+  try {
+    await supabaseAdmin.from("notification_log").insert({
+      store_id: storeId ?? null,
+      recipient_email: to,
+      type,
+      subject,
+      status: "sent",
+    });
+  } catch (logErr) {
+    console.error("Failed to write email success log:", logErr);
   }
 }

@@ -249,6 +249,7 @@ export async function handlePaymentIntentSucceeded(
         const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
           month: "long", day: "numeric", weekday: "short",
           hour: "2-digit", minute: "2-digit",
+          timeZone: "Asia/Tokyo",
         });
         const lineMsg = `✅ 予約確定！\n${store.name}\n${dateStr}${service?.name ? `\n${service.name}` : ""}${reservation.cancel_token ? `\n\nキャンセルはこちら:\n${process.env.NEXT_PUBLIC_APP_URL}/store/${store.slug}/reserve/cancel?token=${reservation.cancel_token}` : ""}`;
         await sendLineMessage({ lineUserId, message: lineMsg, storeId: metadata.store_id });
