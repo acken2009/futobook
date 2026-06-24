@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
       const dateStr = new Date(reservation.reserved_at).toLocaleString("ja-JP", {
         month: "long", day: "numeric", weekday: "short",
         hour: "2-digit", minute: "2-digit",
+        timeZone: "Asia/Tokyo",
       });
       const refundText = refundAmount > 0 ? `\n返金額：¥${refundAmount.toLocaleString()}（${refundPct}%）` : "";
       const lineMsg = `❌ 予約キャンセル完了\n${store.name}\n${dateStr}${refundText}`;

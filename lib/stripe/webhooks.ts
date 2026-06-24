@@ -290,11 +290,30 @@ export async function handleCustomerSubscriptionCreated(
       })
       .select("id")
       .single();
-    if (insertErr || !newCustomer) {
-      console.error("handleCustomerSubscriptionCreated: customer insert failed", insertErr);
+    if (insertErr) {
+      // UNIQUE制約違反（Webhookリトライによる競合）の場合は既存レコードを再取得
+      if (insertErr.code === "23505") {
+        const { data: retryCustomer } = await supabaseAdmin
+          .from("customers")
+          .select("id")
+          .eq("store_id", store_id)
+          .eq("email", customer_email)
+          .single();
+        if (!retryCustomer) {
+          console.error("handleCustomerSubscriptionCreated: customer retry fetch failed");
+          return;
+        }
+        customerId = retryCustomer.id;
+      } else {
+        console.error("handleCustomerSubscriptionCreated: customer insert failed", insertErr);
+        return;
+      }
+    } else if (!newCustomer) {
+      console.error("handleCustomerSubscriptionCreated: customer insert returned no data");
       return;
+    } else {
+      customerId = newCustomer.id;
     }
-    customerId = newCustomer.id;
   }
 
   // customer_subscriptions に記録（冪等性: stripe_subscription_idで upsert）

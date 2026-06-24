@@ -6,7 +6,7 @@ import { z } from "zod";
 const UpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).nullable().optional(),
-  price: z.number().int().min(0).optional(),
+  price: z.number().int().min(1).optional(),
   stock_quantity: z.number().int().min(0).nullable().optional(),
   image_url: z.string().url().nullable().optional(),
   is_active: z.boolean().optional(),
