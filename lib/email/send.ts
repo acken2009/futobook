@@ -37,14 +37,18 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
 
-    // 失敗ログ記録
-    await supabaseAdmin.from("notification_log").insert({
-      store_id: storeId ?? null,
-      recipient_email: to,
-      type,
-      subject,
-      status: "failed",
-      error: String(error),
-    });
+    // 失敗ログ記録（DB障害でもWebhook処理を止めない）
+    try {
+      await supabaseAdmin.from("notification_log").insert({
+        store_id: storeId ?? null,
+        recipient_email: to,
+        type,
+        subject,
+        status: "failed",
+        error: String(error),
+      });
+    } catch (logErr) {
+      console.error("Failed to write email failure log:", logErr);
+    }
   }
 }

@@ -375,8 +375,8 @@ export async function handleProductOrderCompleted(
   const { order_id, store_id } = session.metadata ?? {};
   if (!order_id || !store_id) return;
 
-  // 注文をpaid状態に更新（store_idで自店舗の注文のみ対象）
-  await supabaseAdmin
+  // 注文をpaid状態に更新（pending のものだけ対象 → 冪等性＆二重デクリメント防止）
+  const { data: updatedOrders, error: updateError } = await supabaseAdmin
     .from("orders")
     .update({
       status: "paid",
@@ -384,9 +384,19 @@ export async function handleProductOrderCompleted(
       updated_at: new Date().toISOString(),
     })
     .eq("id", order_id)
-    .eq("store_id", store_id);
+    .eq("store_id", store_id)
+    .eq("status", "pending")
+    .select("id");
 
-  // 在庫を減らす
+  if (updateError) throw updateError;
+
+  // 更新行が0件 = 既に処理済み or 不正なorder_id → デクリメントしない
+  if (!updatedOrders || updatedOrders.length === 0) {
+    console.warn("handleProductOrderCompleted: order already processed or not found", order_id);
+    return;
+  }
+
+  // 在庫を減らす（エラーをログに記録）
   const { data: items } = await supabaseAdmin
     .from("order_items")
     .select("product_id, quantity")
@@ -395,10 +405,13 @@ export async function handleProductOrderCompleted(
   if (items) {
     for (const item of items) {
       // アトミックなデクリメント（0008_fixes.sql で定義したRPC）
-      await supabaseAdmin.rpc("decrement_stock", {
+      const { error: rpcError } = await supabaseAdmin.rpc("decrement_stock", {
         p_product_id: item.product_id,
         p_quantity: item.quantity,
       });
+      if (rpcError) {
+        console.error("decrement_stock failed:", item.product_id, rpcError);
+      }
     }
   }
 
@@ -417,7 +430,7 @@ export async function handleProductOrderCompleted(
 
   if (order && store) {
     const itemsText = (order.order_items as any[])
-      .map((i: any) => `${i.product_name} × ${i.quantity}`)
+      .map((i: any) => `${i.product_name} × ${i.quantity}  ¥${((i.unit_price ?? 0) * i.quantity).toLocaleString()}`)
       .join("\n");
 
     await sendEmail({

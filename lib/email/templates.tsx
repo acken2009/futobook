@@ -34,6 +34,13 @@ function escapeHtml(str: string | undefined | null): string {
     .replace(/'/g, "&#039;");
 }
 
+// href属性用: javascript:スキームを防ぐ
+function safeUrl(url: string | undefined): string {
+  if (!url) return "#";
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  return "#";
+}
+
 function baseTemplate(content: string, title: string, lang: "ja" | "en" = "ja"): string {
   return `
 <!DOCTYPE html>
@@ -41,7 +48,7 @@ function baseTemplate(content: string, title: string, lang: "ja" | "en" = "ja"):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${escapeHtml(title)}</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f9fafb; margin: 0; padding: 40px 16px;">
   <div style="max-width: 520px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -75,9 +82,15 @@ export function reservationConfirmationEmail(
     weekday: "short", hour: "2-digit", minute: "2-digit",
   });
 
+  const eName = escapeHtml(data.customerName);
+  const eStore = escapeHtml(data.storeName);
+  const eService = escapeHtml(data.serviceName);
+  const eSlug = encodeURIComponent(data.storeSlug);
+  const safeCancelUrl = safeUrl(data.cancelUrl);
+
   const t = {
     heading: isEn ? "Booking Confirmation" : "ご予約の確認",
-    greeting: isEn ? `Dear ${data.customerName}, thank you for your booking.` : `${data.customerName} 様、ご予約ありがとうございます。`,
+    greeting: isEn ? `Dear ${eName}, thank you for your booking.` : `${eName} 様、ご予約ありがとうございます。`,
     store: isEn ? "Store" : "店舗",
     dateTime: isEn ? "Date & Time" : "日時",
     service: isEn ? "Service" : "サービス",
@@ -97,9 +110,9 @@ export function reservationConfirmationEmail(
     <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
     <div style="background: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eStore}</td></tr>
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.dateTime}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td></tr>
-        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td></tr>` : ""}
+        ${eService ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eService}</td></tr>` : ""}
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.guests}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${t.guestsVal}</td></tr>
       </table>
     </div>
@@ -107,9 +120,9 @@ export function reservationConfirmationEmail(
     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
       <p style="color: #991b1b; font-size: 13px; margin: 0 0 8px; font-weight: 600;">${t.cancelHeading}</p>
       <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">${t.cancelNote}</p>
-      <a href="${data.cancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
+      <a href="${safeCancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
     </div>` : `<p style="color: #374151; font-size: 14px; margin-bottom: 24px;">${t.noCancel}</p>`}
-    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
+    <a href="${appUrl}/store/${eSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
     `,
     t.subject,
     lang
@@ -144,6 +157,10 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
     minute: "2-digit",
   });
 
+  const eStore = escapeHtml(data.storeName);
+  const eService = escapeHtml(data.serviceName);
+  const safeDashboardUrl = safeUrl(data.dashboardUrl);
+
   const html = baseTemplate(
     `
     <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 8px;">新しい予約が入りました</h2>
@@ -156,9 +173,9 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">日時</td>
           <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td>
         </tr>
-        ${data.serviceName ? `<tr>
+        ${eService ? `<tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">サービス</td>
-          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td>
+          <td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eService}</td>
         </tr>` : ""}
         <tr>
           <td style="color: #6b7280; font-size: 14px; padding: 4px 0;">人数</td>
@@ -189,7 +206,7 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
       </table>
     </div>
 
-    <a href="${data.dashboardUrl}"
+    <a href="${safeDashboardUrl}"
        style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
       ダッシュボードで確認する
     </a>
@@ -229,9 +246,16 @@ export function reservationCancellationEmail(
     minute: "2-digit",
   });
 
+  const eName = escapeHtml(data.customerName);
+  const eStore = escapeHtml(data.storeName);
+  const eService = escapeHtml(data.serviceName);
+  const eSlug = encodeURIComponent(data.storeSlug);
+  // refundPct > 0 の場合のみ返金情報を表示（0は返金なしと同じ扱い）
+  const hasRefund = data.refundAmount != null && data.refundPct != null && data.refundPct > 0;
+
   const t = {
     heading: isEn ? "Booking Cancellation Confirmed" : "ご予約のキャンセル完了",
-    greeting: isEn ? `Your booking at ${data.storeName} has been cancelled.` : `${data.customerName} 様のご予約をキャンセルしました。`,
+    greeting: isEn ? `Your booking at ${eStore} has been cancelled.` : `${eName} 様のご予約をキャンセルしました。`,
     store: isEn ? "Store" : "店舗",
     dateTime: isEn ? "Date & Time" : "日時",
     service: isEn ? "Service" : "サービス",
@@ -252,18 +276,18 @@ export function reservationCancellationEmail(
     <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
     <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eStore}</td></tr>
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.dateTime}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td></tr>
-        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td></tr>` : ""}
+        ${eService ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eService}</td></tr>` : ""}
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.guests}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${t.guestsVal}</td></tr>
       </table>
     </div>
-    ${data.refundAmount != null && data.refundPct != null ? `
+    ${hasRefund ? `
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
       <p style="color: #166534; font-size: 14px; font-weight: 600; margin: 0 0 4px;">${t.refundTitle}</p>
       <p style="color: #15803d; font-size: 14px; margin: 0;">${t.refundNote}</p>
     </div>` : `<p style="color: #374151; font-size: 14px; margin-bottom: 24px;">${t.noRefund}</p>`}
-    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.bookAgain}</a>
+    <a href="${appUrl}/store/${eSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.bookAgain}</a>
     `,
     t.subject,
     lang
@@ -296,11 +320,17 @@ export function reservationRescheduleEmail(
   const oldDate = new Date(data.oldReservedAt).toLocaleString(locale, opts);
   const newDate = new Date(data.newReservedAt).toLocaleString(locale, opts);
 
+  const eName = escapeHtml(data.customerName);
+  const eStore = escapeHtml(data.storeName);
+  const eService = escapeHtml(data.serviceName);
+  const eSlug = encodeURIComponent(data.storeSlug);
+  const safeCancelUrl = safeUrl(data.cancelUrl);
+
   const t = {
     heading: isEn ? "Booking Rescheduled" : "ご予約日時の変更",
     greeting: isEn
-      ? `Dear ${data.customerName}, your booking at ${data.storeName} has been rescheduled.`
-      : `${data.customerName} 様、ご予約の日時が変更されました。`,
+      ? `Dear ${eName}, your booking at ${eStore} has been rescheduled.`
+      : `${eName} 様、ご予約の日時が変更されました。`,
     before: isEn ? "Previous Date & Time" : "変更前",
     after: isEn ? "New Date & Time" : "変更後",
     service: isEn ? "Service" : "サービス",
@@ -324,16 +354,16 @@ export function reservationRescheduleEmail(
       <p style="font-size: 12px; color: #1e40af; font-weight: 600; margin: 0 0 4px;">${t.after}</p>
       <table style="width: 100%; border-collapse: collapse;">
         <tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0; width: 40%;"></td><td style="font-weight: 700; font-size: 16px; padding: 2px 0; color: #1d4ed8;">${newDate}</td></tr>
-        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0;">${t.service}</td><td style="font-size: 14px; padding: 2px 0;">${data.serviceName}</td></tr>` : ""}
+        ${eService ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0;">${t.service}</td><td style="font-size: 14px; padding: 2px 0;">${eService}</td></tr>` : ""}
         <tr><td style="color: #6b7280; font-size: 14px; padding: 2px 0;">${t.guests}</td><td style="font-size: 14px; padding: 2px 0;">${t.guestsVal}</td></tr>
       </table>
     </div>
     ${data.cancelUrl ? `
     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
       <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">${t.cancelNote}</p>
-      <a href="${data.cancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
+      <a href="${safeCancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
     </div>` : ""}
-    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
+    <a href="${appUrl}/store/${eSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
     `,
     t.subject,
     lang
@@ -363,11 +393,17 @@ export function reservationReminderEmail(
     weekday: "short", hour: "2-digit", minute: "2-digit",
   });
 
+  const eName = escapeHtml(data.customerName);
+  const eStore = escapeHtml(data.storeName);
+  const eService = escapeHtml(data.serviceName);
+  const eSlug = encodeURIComponent(data.storeSlug);
+  const safeCancelUrl = safeUrl(data.cancelUrl);
+
   const t = {
     heading: isEn ? "Booking Reminder" : "予約リマインダー",
     greeting: isEn
-      ? `Dear ${data.customerName}, your booking at ${data.storeName} is tomorrow.`
-      : `${data.customerName} 様、明日のご予約をお知らせします。`,
+      ? `Dear ${eName}, your booking at ${eStore} is tomorrow.`
+      : `${eName} 様、明日のご予約をお知らせします。`,
     store: isEn ? "Store" : "店舗",
     dateTime: isEn ? "Date & Time" : "日時",
     service: isEn ? "Service" : "サービス",
@@ -385,18 +421,18 @@ export function reservationReminderEmail(
     <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
     <div style="background: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eStore}</td></tr>
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.dateTime}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${date}</td></tr>
-        ${data.serviceName ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.serviceName}</td></tr>` : ""}
+        ${eService ? `<tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.service}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eService}</td></tr>` : ""}
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.guests}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${t.guestsVal}</td></tr>
       </table>
     </div>
     ${data.cancelUrl ? `
     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
       <p style="color: #7f1d1d; font-size: 13px; margin: 0 0 12px;">${t.cancelNote}</p>
-      <a href="${data.cancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
+      <a href="${safeCancelUrl}" style="display: inline-block; background: white; color: #dc2626; border: 1px solid #dc2626; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">${t.cancelBtn}</a>
     </div>` : ""}
-    <a href="${appUrl}/store/${data.storeSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
+    <a href="${appUrl}/store/${eSlug}${isEn ? "?lang=en" : ""}" style="display: block; text-align: center; background: #3B82F6; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.viewStore}</a>
     `,
     t.subject,
     lang
@@ -416,9 +452,13 @@ export function subscriptionConfirmationEmail(
     maximumFractionDigits: 0,
   }).format(data.price);
 
+  const eName = escapeHtml(data.customerName);
+  const eStore = escapeHtml(data.storeName);
+  const ePlan = escapeHtml(data.planName);
+
   const t = {
     heading: isEn ? "Subscription Confirmed" : "サブスクリプション加入完了",
-    greeting: isEn ? `Dear ${data.customerName}, thank you for subscribing!` : `${data.customerName} 様、ご加入ありがとうございます！`,
+    greeting: isEn ? `Dear ${eName}, thank you for subscribing!` : `${eName} 様、ご加入ありがとうございます！`,
     store: isEn ? "Store" : "店舗",
     plan: isEn ? "Plan" : "プラン",
     billing: isEn ? "Billing" : "料金",
@@ -436,10 +476,10 @@ export function subscriptionConfirmationEmail(
     <p style="color: #6b7280; margin: 0 0 24px;">${t.greeting}</p>
     <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.storeName}</td></tr>
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.plan}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.planName}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0; width: 40%;">${t.store}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${eStore}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.plan}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${ePlan}</td></tr>
         <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.billing}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${t.billingVal}</td></tr>
-        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.nextBilling}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${data.nextBillingDate}</td></tr>
+        <tr><td style="color: #6b7280; font-size: 14px; padding: 4px 0;">${t.nextBilling}</td><td style="font-weight: 600; font-size: 14px; padding: 4px 0;">${escapeHtml(data.nextBillingDate)}</td></tr>
       </table>
     </div>
     <p style="color: #374151; font-size: 14px; margin-bottom: 24px;">${t.note}</p>

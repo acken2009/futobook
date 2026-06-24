@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
             .from("orders")
             .update({ status: "cancelled", updated_at: new Date().toISOString() })
             .eq("id", expired.metadata.order_id)
+            .eq("store_id", expired.metadata.store_id)
             .eq("status", "pending");
         }
         break;
