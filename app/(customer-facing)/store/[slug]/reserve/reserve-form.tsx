@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { addDays, format, isSameDay, setHours, setMinutes } from "date-fns";
+import { addDays, format, isSameDay } from "date-fns";
 import { ja, enUS } from "date-fns/locale";
+
+// 店舗の営業時間・予約枠はすべて日本時間（JST）基準。
+// ブラウザのタイムゾーンに関わらず同じ枠が表示・送信されるようにする
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 interface Props {
   store: { id: string; name: string; slug: string; stripe_account_status?: string };
@@ -98,8 +102,11 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
     cancelPolicyAgree: isEn ? "I have read and agree to the cancellation policy" : "キャンセルポリシーを確認し、同意します",
   };
 
+  // JSTの「今日」を起点に予約可能日を生成する
+  const jstTodayStr = new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10);
+  const jstToday = new Date(`${jstTodayStr}T00:00:00`);
   const availableDates = Array.from({ length: advanceDays }, (_, i) =>
-    addDays(new Date(), i + 1)
+    addDays(jstToday, i + 1)
   ).filter((date) => getTimeSlots(date).length > 0);
 
   function getTimeSlots(date: Date): string[] {
@@ -124,20 +131,12 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
       [closeH, closeM] = schedule.close_time.split(":").map(Number);
     }
 
+    // 予約済みスロットをJSTの日付・時刻で比較する
     const bookedTimesForDate = new Set(
       bookedSlots
-        .filter((iso) => {
-          const d = new Date(iso);
-          return (
-            d.getFullYear() === date.getFullYear() &&
-            d.getMonth() === date.getMonth() &&
-            d.getDate() === date.getDate()
-          );
-        })
-        .map((iso) => {
-          const d = new Date(iso);
-          return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-        })
+        .map((iso) => new Date(new Date(iso).getTime() + JST_OFFSET_MS).toISOString())
+        .filter((jstIso) => jstIso.slice(0, 10) === dateStr)
+        .map((jstIso) => jstIso.slice(11, 16))
     );
 
     const slots: string[] = [];
@@ -164,8 +163,10 @@ export function ReserveForm({ store, services, settings, schedules, overrides = 
     setLoading(true);
     setError(null);
 
-    const [h, m] = selectedTime.split(":").map(Number);
-    const reservedAt = setMinutes(setHours(selectedDate, h), m).toISOString();
+    // 選択された枠をJST（+09:00）の日時として送信する
+    const reservedAt = new Date(
+      `${format(selectedDate, "yyyy-MM-dd")}T${selectedTime}:00+09:00`
+    ).toISOString();
     const requiresPayment =
       selectedService?.price && store.stripe_account_status === "active";
 

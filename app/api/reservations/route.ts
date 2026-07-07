@@ -6,6 +6,14 @@ import { sendEmail } from "@/lib/email/send";
 import { sendLineMessage } from "@/lib/line/send";
 import { reservationConfirmationEmail, reservationNotificationEmail } from "@/lib/email/templates";
 import { reservationRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  validateReservationSlot,
+  DEFAULT_SETTINGS,
+  JST_OFFSET_MS,
+  type ReservationSettings,
+  type AvailabilitySchedule,
+  type AvailabilityOverride,
+} from "@/lib/reservations/validate";
 import { z } from "zod";
 
 const ReserveSchema = z.object({
@@ -50,15 +58,72 @@ export async function POST(request: NextRequest) {
     customer,
   } = result.data;
 
-  // 店舗確認
+  // 店舗確認（営業時間・予約設定も同時取得）
   const { data: store } = await supabaseAdmin
     .from("stores")
-    .select("id, name, slug, owner_id")
+    .select(`
+      id, name, slug, owner_id, platform_plan_id,
+      reservation_settings(slot_duration_minutes, max_party_size, advance_booking_days),
+      availability_schedules(day_of_week, open_time, close_time, is_closed),
+      availability_overrides(date, is_closed, open_time, close_time)
+    `)
     .eq("id", store_id)
     .eq("status", "active")
     .single();
 
   if (!store) return apiError("店舗が見つかりません", 404);
+
+  // ── サーバー側バリデーション（クライアントの値は信用しない） ──
+  const rawSettings = store.reservation_settings;
+  const settings: ReservationSettings =
+    (Array.isArray(rawSettings) ? rawSettings[0] : rawSettings) ?? DEFAULT_SETTINGS;
+  const schedules = (store.availability_schedules ?? []) as AvailabilitySchedule[];
+  const overrides = (store.availability_overrides ?? []) as AvailabilityOverride[];
+
+  if (party_size > settings.max_party_size) {
+    return apiError(`人数は${settings.max_party_size}名までです`, 400);
+  }
+
+  const slotCheck = validateReservationSlot({
+    reservedAt: new Date(reserved_at),
+    settings,
+    schedules,
+    overrides,
+  });
+  if (!slotCheck.ok) {
+    return apiError(slotCheck.reason, 400);
+  }
+
+  // ── プランの月間予約上限チェック（スタータープラン: 月20件など） ──
+  if (store.platform_plan_id) {
+    const { data: plan } = await supabaseAdmin
+      .from("platform_subscription_plans")
+      .select("max_reservations_per_month")
+      .eq("id", store.platform_plan_id)
+      .single();
+
+    const monthlyLimit = plan?.max_reservations_per_month;
+    if (monthlyLimit) {
+      // 当月（JST）に受け付けた予約数をカウント（キャンセル分は除く）
+      const jstNow = new Date(Date.now() + JST_OFFSET_MS);
+      const monthStart = new Date(
+        Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), 1) - JST_OFFSET_MS
+      );
+      const { count } = await supabaseAdmin
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", store_id)
+        .neq("status", "cancelled")
+        .gte("created_at", monthStart.toISOString());
+
+      if ((count ?? 0) >= monthlyLimit) {
+        return apiError(
+          "今月のオンライン予約受付は上限に達しました。お手数ですが店舗へ直接お問い合わせください。",
+          400
+        );
+      }
+    }
+  }
 
   // サービス金額取得
   let totalAmount: number | null = null;
