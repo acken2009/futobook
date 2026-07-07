@@ -6,8 +6,13 @@ import { reservationReminderEmail } from "@/lib/email/templates";
 
 export const dynamic = "force-dynamic";
 
-// Vercel Cron: 毎時0分に実行
-// 予約の24時間前（±30分ウィンドウ）にリマインダーメールを送信
+// Vercel Cron: 1日1回（Hobbyプランの実行頻度上限）
+// 予約の12〜36時間前の範囲を対象にリマインダーメールを送信
+//
+// 24時間ぴったりの検知窓だと1日1回実行では取りこぼしうるため、
+// 24時間幅の窓（+12h〜+36h）を使う。毎日同じ時刻に実行すれば
+// 窓が隙間なく連続するため、reminder_sent_at による重複防止と合わせて
+// 全ての確定予約に一度だけリマインダーが届く
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -15,9 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  // 毎時実行：24時間後±30分の予約を対象（重複防止のため reminder_sent_at IS NULL 条件を追加）
-  const windowStart = new Date(now.getTime() + 23.5 * 60 * 60 * 1000).toISOString();
-  const windowEnd = new Date(now.getTime() + 24.5 * 60 * 60 * 1000).toISOString();
+  const windowStart = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(now.getTime() + 36 * 60 * 60 * 1000).toISOString();
 
   const { data: reservations, error } = await supabaseAdmin
     .from("reservations")
