@@ -46,10 +46,15 @@ Run the SQL directly in Supabase Dashboard → SQL Editor.
 ### Data Flow: Reservation with Payment
 
 1. Customer fills `reserve-form.tsx` → POST `/api/reservations` (creates reservation with status `pending`, generates `cancel_token`)
-2. If `requiresPayment=true` → POST `/api/stripe/checkout` → returns Stripe Checkout URL
+   - Server-side validation in `lib/reservations/validate.ts`: future datetime, business hours, slot grid, party size — **all in JST** (the client also generates slots as JST `+09:00` regardless of browser timezone)
+   - Monthly plan limit (`max_reservations_per_month`) is enforced here
+2. If `requiresPayment=true` → POST `/api/stripe/checkout` → returns Stripe Checkout URL (session `expires_at` = 30 min)
 3. Checkout session is created on the **store's connected Stripe account** with `application_fee_amount`
 4. On success → Stripe fires `payment_intent.succeeded` → Connect webhook (`/api/webhooks/stripe-connect`) → updates reservation to `confirmed`, sends confirmation email with cancel link
-5. **Cancel flow**: customer clicks link → `/store/[slug]/reserve/cancel?token=...` → POST `/api/reservations/cancel` → Stripe refund + status update + email
+   - **Important**: with current Stripe API versions, `session.payment_intent` is `null` at session creation, so the `payments` row is created with a null intent ID; the webhook reconciles by `metadata.reservation_id` and backfills the intent ID
+   - If the reservation was already cancelled (cron timeout / token cancel) or the slot was taken (unique violation on confirm), the webhook auto-refunds in full (`refundOrphanedPayment`, idempotency key `auto_refund_{reservationId}`)
+   - `checkout.session.expired` cancels the still-pending reservation to free the slot
+5. **Cancel flow**: customer clicks link → `/store/[slug]/reserve/cancel?token=...` → POST `/api/reservations/cancel` → Stripe refund (idempotency key `cancel_refund_{reservationId}`) + conditional status update + email
 
 ### Data Flow: Platform Plan Billing
 
@@ -63,13 +68,14 @@ Run the SQL directly in Supabase Dashboard → SQL Editor.
 - `lib/supabase/server.ts` — server components and API routes for authenticated user operations (respects RLS)
 - `lib/supabase/admin.ts` (`supabaseAdmin`) — bypasses RLS; used in all API routes and webhooks that need cross-tenant access
 - `lib/supabase/client.ts` — browser client for client components
+- `supabaseAdmin`, `stripe` (server), and Resend are **lazily initialized** so `next build` works without secrets; missing env vars throw at first use with a clear message
 
 ### Stripe Integration
 
 - **Two webhook endpoints**:
   - `/api/webhooks/stripe` — platform account events (platform subscriptions, account updates)
   - `/api/webhooks/stripe-connect` — connected account events (customer payments, customer subscriptions)
-- Both use idempotency via `webhook_events` table (unique on `stripe_event_id`)
+- Both use idempotency via `webhook_events` table (unique on `stripe_event_id`); on processing failure the row is deleted (`unmarkEventAsProcessed`) so Stripe's retry can reprocess
 - Connect webhook events include `stripe-account` header → stored as `{accountId}_{eventId}` for uniqueness
 - Platform fee calculation is in `lib/stripe/fees.ts` (imported by `lib/stripe/client.ts`) — keep fee logic here to enable unit testing without Stripe SDK initialization
 
@@ -91,6 +97,14 @@ Run the SQL directly in Supabase Dashboard → SQL Editor.
 ### Rate Limiting
 
 `lib/rate-limit.ts` — in-memory (per-process) rate limiter. Two presets: `reservationRateLimit` (10 req/10min per IP) and `checkoutRateLimit` (5 req/1min per IP).
+
+### Cron Jobs (Hobby plan constraint)
+
+The Vercel project is on the **Hobby plan**, which only allows cron jobs to run once per day. Both crons in `vercel.json` are scheduled daily:
+- `cancel-pending-reservations` (03:00 UTC) — backup cleanup only; the primary mechanism for releasing an abandoned reservation's slot is the `checkout.session.expired` Stripe webhook (instant)
+- `send-reminders` (00:00 UTC) — uses a 24h-wide detection window (+12h to +36h from now) instead of a narrow ±30min window, so a once-daily run doesn't miss reservations; `reminder_sent_at IS NULL` prevents duplicate sends across days
+
+If the plan is ever upgraded to Pro, these can revert to finer-grained schedules (e.g. `*/5 * * * *` and `0 * * * *`) and the reminder window can shrink back to ±30min.
 
 ## Environment Variables
 
