@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { checkFeature } from "@/lib/plans/features";
 
 const BUCKET = "store-assets";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -51,6 +52,10 @@ export async function POST(request: NextRequest) {
     .eq("owner_id", user.id)
     .single();
   if (!store) return apiError("店舗が見つかりません", 404);
+
+  // プラン機能フェンス: 画像（ロゴ・カバー・ギャラリー）はベーシック以上
+  const gate = await checkFeature(store.id, "customization");
+  if (gate) return apiError(gate, 403);
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { checkFeature } from "@/lib/plans/features";
 import { z } from "zod";
 
 const LineSettingsSchema = z.object({
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (!store) return apiError("店舗が見つかりません", 404);
+
+  // プラン機能フェンス
+  const gate = await checkFeature(store.id, "lineNotifications");
+  if (gate) return apiError(gate, 403);
 
   let rawBody: unknown;
   try { rawBody = await request.json(); } catch { return apiError("Invalid JSON", 400); }

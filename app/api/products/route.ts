@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { checkFeature } from "@/lib/plans/features";
 import { z } from "zod";
 
 const ProductSchema = z.object({
@@ -18,6 +19,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const storeId = searchParams.get("store_id");
   if (!storeId) return apiError("store_id が必要です", 400);
+
+  // プラン機能フェンス: フリープランの店舗はショップを公開しない
+  const gate = await checkFeature(storeId, "productSales");
+  if (gate) return Response.json({ products: [] });
 
   const { data, error } = await supabaseAdmin
     .from("products")
@@ -44,6 +49,10 @@ export async function POST(request: NextRequest) {
     .eq("owner_id", user.id)
     .single();
   if (!store) return apiError("店舗が見つかりません", 404);
+
+  // プラン機能フェンス
+  const gate = await checkFeature(store.id, "productSales");
+  if (gate) return apiError(gate, 403);
 
   let body: unknown;
   try { body = await request.json(); } catch { return apiError("Invalid JSON", 400); }

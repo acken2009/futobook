@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { stripe } from "@/lib/stripe/client";
 import { apiError } from "@/lib/utils";
+import { checkFeature } from "@/lib/plans/features";
 import { z } from "zod";
 
 const CreatePlanSchema = z.object({
@@ -36,6 +37,10 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (!store) return apiError("権限がありません", 403);
+
+  // プラン機能フェンス: 月額会員機能はスタンダードプラン専用
+  const gate = await checkFeature(store.id, "customerSubscriptions");
+  if (gate) return apiError(gate, 403);
 
   let stripeProductId: string | null = null;
   let stripePriceId: string | null = null;

@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
+import { UpgradeNotice } from "@/components/upgrade-notice";
+import { getStoreFeatures, UPGRADE_MESSAGES } from "@/lib/plans/features";
 import { subDays, startOfDay, format } from "date-fns";
 
 
@@ -17,6 +19,12 @@ export default async function AnalyticsPage() {
     .single();
 
   if (!store) redirect("/dashboard/onboarding");
+
+  // プラン機能フェンス
+  const features = await getStoreFeatures(store.id);
+  if (!features.analytics) {
+    return <UpgradeNotice message={UPGRADE_MESSAGES.analytics} />;
+  }
 
   const now = new Date();
   const thirtyDaysAgo = startOfDay(subDays(now, 29));

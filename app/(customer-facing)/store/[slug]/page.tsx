@@ -64,11 +64,15 @@ export default async function StorePage({ params, searchParams }: Props) {
     // table not yet created — skip gallery
   }
 
+  // プラン機能フェンス: 店舗のプラン階層に応じて公開機能を出し分ける
+  const { getStoreFeatures } = await import("@/lib/plans/features");
+  const features = await getStoreFeatures(store.id);
+
   const custom = (store.store_customizations as any);
   const services = ((store.service_items as any[]) ?? []).filter((s: any) => s.is_active !== false);
-  const plans = ((store.store_subscription_plans as any[]) ?? []).filter(
-    (p) => p.is_active
-  );
+  const plans = features.customerSubscriptions
+    ? ((store.store_subscription_plans as any[]) ?? []).filter((p) => p.is_active)
+    : [];
   const primaryColor = custom?.primary_color ?? "#3B82F6";
   const secondaryColor = custom?.secondary_color ?? "#1E40AF";
   const logoUrl = custom?.logo_url as string | null;
@@ -175,12 +179,14 @@ export default async function StorePage({ params, searchParams }: Props) {
                 {t.subscribe}
               </Link>
             )}
-            <Link
-              href={`/store/${slug}/shop`}
-              className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
-            >
-              🛍️ {t.shop}
-            </Link>
+            {features.productSales && (
+              <Link
+                href={`/store/${slug}/shop`}
+                className="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              >
+                🛍️ {t.shop}
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -352,6 +358,18 @@ export default async function StorePage({ params, searchParams }: Props) {
           </section>
         )}
       </div>
+
+      {/* フリープランは futobook のブランディングを表示（有料プランで非表示） */}
+      {!features.hideBranding && (
+        <footer className="border-t border-gray-100 py-6 text-center">
+          <a
+            href={process.env.NEXT_PUBLIC_APP_URL ?? "/"}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Powered by <span className="font-semibold">futobook</span> — 無料で予約ページを作成
+          </a>
+        </footer>
+      )}
     </div>
   );
 }

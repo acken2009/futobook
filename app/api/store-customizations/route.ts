@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { apiError } from "@/lib/utils";
+import { getStoreFeatures } from "@/lib/plans/features";
 import { z } from "zod";
 
 const CustomizationSchema = z.object({
@@ -40,6 +41,17 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return apiError(parsed.error.errors[0].message, 400);
 
   const body = parsed.data;
+
+  // プラン機能フェンス: ブランド要素（色・ロゴ・カバー）はベーシック以上。
+  // 基本情報（店舗名・説明・住所・電話・SNS）は全プランで編集可能なので、
+  // フリープランではブランド要素だけを無視して保存する
+  const features = await getStoreFeatures(store.id);
+  if (!features.customization) {
+    delete body.primary_color;
+    delete body.secondary_color;
+    delete body.logo_url;
+    delete body.cover_image_url;
+  }
 
   // まず全フィールド（description_en含む）で試みる
   const fullPayload = { store_id: store.id, ...body };

@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { CustomizationForm } from "./customization-form";
+import { UpgradeNotice } from "@/components/upgrade-notice";
+import { getStoreFeatures } from "@/lib/plans/features";
 
 export default async function CustomizationPage() {
   const supabase = await createClient();
@@ -29,12 +31,20 @@ export default async function CustomizationPage() {
     // table not yet created before migration
   }
 
+  const features = await getStoreFeatures(store.id);
+
   return (
     <div className="p-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">店舗カスタマイズ</h1>
       <p className="text-gray-500 mb-8">
         店舗ページの外観を自由にカスタマイズできます。
       </p>
+      {!features.customization && (
+        <UpgradeNotice
+          variant="banner"
+          message="ブランドカスタマイズ（色・ロゴ・カバー・ギャラリー画像）はベーシックプラン以上でご利用いただけます。店舗名・説明・住所などの基本情報は編集できます。"
+        />
+      )}
       <CustomizationForm
         storeId={store.id}
         customization={(Array.isArray(store.store_customizations) ? store.store_customizations[0] : store.store_customizations) ?? null}

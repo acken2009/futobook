@@ -4,6 +4,7 @@ import { stripe } from "@/lib/stripe/client";
 import { calculatePlatformFee } from "@/lib/stripe/fees";
 import { apiError } from "@/lib/utils";
 import { checkoutRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { checkFeature } from "@/lib/plans/features";
 import { z } from "zod";
 
 const Schema = z.object({
@@ -42,6 +43,10 @@ export async function POST(request: NextRequest) {
   if (store.stripe_account_status !== "active")
     return apiError("この店舗は現在決済を受け付けていません", 400);
 
+  // プラン機能フェンス: フリープランの店舗は物販決済を受け付けない
+  const gate = await checkFeature(store.id, "productSales");
+  if (gate) return apiError("この店舗では現在オンライン販売をご利用いただけません", 403);
+
   const { data: product } = await supabaseAdmin
     .from("products")
     .select("*")
@@ -54,8 +59,8 @@ export async function POST(request: NextRequest) {
   if (product.stock_quantity !== null && product.stock_quantity < quantity)
     return apiError("在庫が不足しています", 400);
 
-  // プラットフォーム手数料率（デフォルト5%）
-  let platformFeePct = 0.05;
+  // プラットフォーム手数料率（デフォルト=フリープランの4.9%）
+  let platformFeePct = 0.049;
   if (store.platform_plan_id) {
     const { data: plan } = await supabaseAdmin
       .from("platform_subscription_plans")

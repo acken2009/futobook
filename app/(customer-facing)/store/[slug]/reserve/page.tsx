@@ -46,6 +46,10 @@ export default async function ReservePage({ params, searchParams }: Props) {
 
   const bookedSlots = (bookedReservations ?? []).map((r) => r.reserved_at as string);
 
+  // プラン機能フェンス（ブランディング表示判定）
+  const { getStoreFeatures } = await import("@/lib/plans/features");
+  const features = await getStoreFeatures(store.id);
+
   const custom = (store.store_customizations as any);
 
   return (
@@ -75,6 +79,18 @@ export default async function ReservePage({ params, searchParams }: Props) {
           lang={isEn ? "en" : "ja"}
         />
       </div>
+
+      {/* フリープランは futobook のブランディングを表示（有料プランで非表示） */}
+      {!features.hideBranding && (
+        <footer className="py-6 text-center">
+          <a
+            href={process.env.NEXT_PUBLIC_APP_URL ?? "/"}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Powered by <span className="font-semibold">futobook</span> — 無料で予約ページを作成
+          </a>
+        </footer>
+      )}
     </div>
   );
 }

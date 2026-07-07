@@ -4,6 +4,7 @@ import { stripe } from "@/lib/stripe/client";
 import { calculatePlatformFee, calculateSubscriptionFeePercent } from "@/lib/stripe/fees";
 import { apiError } from "@/lib/utils";
 import { checkoutRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { checkFeature } from "@/lib/plans/features";
 import { z } from "zod";
 
 const CheckoutSchema = z.object({
@@ -55,8 +56,8 @@ export async function POST(request: NextRequest) {
     return apiError("この店舗は現在決済を受け付けていません", 400);
   }
 
-  // プラットフォーム手数料率（プランによって異なる、デフォルト5%）
-  let platformFeePct = 0.05;
+  // プラットフォーム手数料率（プランによって異なる、デフォルト=フリープランの4.9%）
+  let platformFeePct = 0.049;
   if (store.platform_plan_id) {
     const { data: plan } = await supabaseAdmin
       .from("platform_subscription_plans")
@@ -144,6 +145,10 @@ export async function POST(request: NextRequest) {
   // 顧客サブスク決済
   // ============================================================
   if (type === "subscription" && result.data.plan_id && result.data.customer) {
+    // プラン機能フェンス: 月額会員機能はスタンダードプラン専用
+    const gate = await checkFeature(store_id, "customerSubscriptions");
+    if (gate) return apiError("この店舗では現在サブスクリプションの受付を停止しています", 403);
+
     const { data: plan } = await supabaseAdmin
       .from("store_subscription_plans")
       .select("id, name, price, stripe_price_id, interval")

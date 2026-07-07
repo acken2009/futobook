@@ -30,8 +30,15 @@ export default async function SubscribePage({ params, searchParams }: Props) {
 
   if (!store) notFound();
 
+  // プラン機能フェンス: 月額会員機能はスタンダードプラン専用。
+  // 対象外の店舗ではプランを表示しない（過去に作成済みでも非公開扱い）
+  const { getStoreFeatures } = await import("@/lib/plans/features");
+  const features = await getStoreFeatures(store.id);
+
   const custom = (store.store_customizations as any);
-  const plans = ((store.store_subscription_plans as any[]) ?? []).filter((p) => p.is_active);
+  const plans = features.customerSubscriptions
+    ? ((store.store_subscription_plans as any[]) ?? []).filter((p) => p.is_active)
+    : [];
   const primaryColor = custom?.primary_color ?? "#3B82F6";
   const secondaryColor = custom?.secondary_color ?? "#1E40AF";
   const selectedPlan = planId ? plans.find((p: any) => p.id === planId) : plans[0];
