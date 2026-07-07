@@ -163,6 +163,8 @@ export async function POST(request: NextRequest) {
         metadata: { type: "product_order", order_id: order.id, store_id },
         success_url: `${appUrl}/store/${store.slug}/shop/success?order_id=${order.id}`,
         cancel_url: `${appUrl}/store/${store.slug}/shop`,
+        // 長時間pendingの注文を残さないためセッションは30分で失効させる（Stripeの最短値）
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
       { stripeAccount: store.stripe_account_id! }
     );

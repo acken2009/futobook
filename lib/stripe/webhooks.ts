@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { sendLineMessage } from "@/lib/line/send";
 import {
+  escapeHtml,
   reservationConfirmationEmail,
   subscriptionConfirmationEmail,
 } from "@/lib/email/templates";
@@ -36,6 +37,19 @@ export async function markEventAsProcessed(
     throw error;
   }
   return true;
+}
+
+/**
+ * 処理失敗時にイベントを未処理に戻す（Stripeの再送で再処理できるようにする）
+ */
+export async function unmarkEventAsProcessed(stripeEventId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("webhook_events")
+    .delete()
+    .eq("stripe_event_id", stripeEventId);
+  if (error) {
+    console.error("unmarkEventAsProcessed failed:", stripeEventId, error);
+  }
 }
 
 // ============================================================
@@ -159,22 +173,97 @@ export async function handlePlatformSubscriptionCreated(
 // ============================================================
 
 /**
+ * 予約が成立しなかった入金（キャンセル済み予約への入金・枠競合）を全額返金する
+ */
+async function refundOrphanedPayment(
+  paymentIntent: Stripe.PaymentIntent,
+  connectedAccountId: string,
+  reservationId: string,
+  reason: string
+): Promise<void> {
+  try {
+    await stripe.refunds.create(
+      { payment_intent: paymentIntent.id },
+      {
+        stripeAccount: connectedAccountId,
+        // 同一予約への自動返金は一度だけ（Webhookの再送・重複でも二重返金しない）
+        idempotencyKey: `auto_refund_${reservationId}`,
+      }
+    );
+  } catch (e) {
+    console.error("refundOrphanedPayment: refund failed", reservationId, e);
+    throw e; // Stripeに再送させる
+  }
+
+  await supabaseAdmin
+    .from("payments")
+    .update({ status: "refunded" })
+    .eq("stripe_payment_intent_id", paymentIntent.id);
+
+  // 顧客へお詫びメール
+  const { data: reservation } = await supabaseAdmin
+    .from("reservations")
+    .select("reserved_at, customers(name, email), stores(id, name)")
+    .eq("id", reservationId)
+    .single();
+
+  const customer = reservation?.customers as unknown as { name: string; email: string } | null;
+  const store = reservation?.stores as unknown as { id: string; name: string } | null;
+  if (customer?.email && store) {
+    const dateStr = reservation
+      ? new Date(reservation.reserved_at).toLocaleString("ja-JP", {
+          month: "long", day: "numeric", weekday: "short",
+          hour: "2-digit", minute: "2-digit",
+          timeZone: "Asia/Tokyo",
+        })
+      : "";
+    await sendEmail({
+      to: customer.email,
+      subject: `【${store.name}】ご予約を承れませんでした（全額返金いたします）`,
+      html: `<p>${escapeHtml(customer.name)} 様</p>
+<p>${dateStr} のご予約について、${escapeHtml(reason)}。</p>
+<p>お支払いいただいた金額は全額返金いたします（返金の反映にはカード会社により数日かかる場合があります）。</p>
+<p>ご迷惑をおかけして申し訳ございません。別の日時で改めてご予約いただけますと幸いです。</p>`,
+      storeId: store.id,
+      type: "reservation_refund",
+    });
+  }
+}
+
+/**
  * 顧客決済成功
  */
 export async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
-  _connectedAccountId: string
+  connectedAccountId: string
 ): Promise<void> {
   const { metadata } = paymentIntent;
 
   // payments テーブル更新
-  await supabaseAdmin
-    .from("payments")
-    .update({
-      status: "succeeded",
-      stripe_charge_id: paymentIntent.latest_charge as string,
-    })
-    .eq("stripe_payment_intent_id", paymentIntent.id);
+  // Checkout Session 作成時点では PaymentIntent が未生成（intent ID は null で記録）のため、
+  // metadata.reservation_id での照合を優先し、intent ID とステータスをここで確定させる
+  const paymentUpdate = {
+    status: "succeeded",
+    stripe_payment_intent_id: paymentIntent.id,
+    stripe_charge_id: paymentIntent.latest_charge as string,
+  };
+
+  let paymentsUpdated = 0;
+  if (metadata?.reservation_id) {
+    const { data: updated } = await supabaseAdmin
+      .from("payments")
+      .update(paymentUpdate)
+      .contains("metadata", { reservation_id: metadata.reservation_id })
+      .eq("status", "pending")
+      .select("id");
+    paymentsUpdated = updated?.length ?? 0;
+  }
+  if (paymentsUpdated === 0) {
+    await supabaseAdmin
+      .from("payments")
+      .update(paymentUpdate)
+      .eq("stripe_payment_intent_id", paymentIntent.id);
+  }
 
   // 予約の確定 + メール送信
   if (!metadata?.reservation_id) {
@@ -182,12 +271,32 @@ export async function handlePaymentIntentSucceeded(
   }
 
   if (metadata?.reservation_id) {
-    // Cronによるキャンセル済み予約を誤ってconfirmedに戻さないようガード
-    await supabaseAdmin
+    // すでにキャンセル済み（Cronの期限切れ取消・トークンキャンセル）の予約への入金は全額返金する
+    const { data: current } = await supabaseAdmin
+      .from("reservations")
+      .select("status")
+      .eq("id", metadata.reservation_id)
+      .single();
+
+    if (current?.status === "cancelled") {
+      await refundOrphanedPayment(paymentIntent, connectedAccountId, metadata.reservation_id, "予約が期限切れのためキャンセルされました");
+      return;
+    }
+
+    const { error: confirmError } = await supabaseAdmin
       .from("reservations")
       .update({ status: "confirmed" })
       .eq("id", metadata.reservation_id)
       .neq("status", "cancelled");
+
+    if (confirmError) {
+      // 同時刻の別予約が先に確定していた場合（UNIQUE違反）→ 全額返金して終了
+      if (confirmError.code === "23505") {
+        await refundOrphanedPayment(paymentIntent, connectedAccountId, metadata.reservation_id, "同じ時間帯の予約が先に確定していました");
+        return;
+      }
+      throw confirmError;
+    }
 
     // 予約確認メール
     const { data: reservation } = await supabaseAdmin
@@ -450,13 +559,13 @@ export async function handleProductOrderCompleted(
 
   if (order && store) {
     const itemsText = (order.order_items as any[])
-      .map((i: any) => `${i.product_name} × ${i.quantity}  ¥${((i.unit_price ?? 0) * i.quantity).toLocaleString()}`)
+      .map((i: any) => `${escapeHtml(i.product_name)} × ${i.quantity}  ¥${((i.unit_price ?? 0) * i.quantity).toLocaleString()}`)
       .join("\n");
 
     await sendEmail({
       to: order.customer_email,
       subject: `【${store.name}】ご注文ありがとうございます`,
-      html: `<p>${order.customer_name} 様</p>
+      html: `<p>${escapeHtml(order.customer_name)} 様</p>
 <p>ご注文を承りました。</p>
 <p><strong>注文内容</strong></p>
 <pre>${itemsText}</pre>
@@ -473,7 +582,7 @@ export async function handleProductOrderCompleted(
         await sendEmail({
           to: ownerUser.user.email,
           subject: `【${store.name}】新しい注文が入りました`,
-          html: `<p>注文者: ${order.customer_name}（${order.customer_email}）</p>
+          html: `<p>注文者: ${escapeHtml(order.customer_name)}（${escapeHtml(order.customer_email)}）</p>
 <pre>${itemsText}</pre>
 <p>合計: ¥${(order.total_amount ?? 0).toLocaleString()}</p>`,
           storeId: store_id,

@@ -108,13 +108,23 @@ export async function POST(request: NextRequest) {
             store_id: store_id,
           },
         },
+        // checkout.session.expired で予約枠を即時解放するためセッションにも付与
+        metadata: {
+          type: "reservation",
+          reservation_id: reservation.id,
+          store_id: store_id,
+        },
         success_url: `${appUrl}/store/${store.slug}/reserve/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/store/${store.slug}/reserve`,
+        // Cronによるpending予約の期限切れ取消（35分）より先にセッションを失効させる
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
       { stripeAccount: store.stripe_account_id! }
     );
 
     // paymentsテーブルに仮記録
+    // 注: 現行のStripe APIではセッション作成時点でPaymentIntentが未生成のためnull。
+    // intent IDはWebhook（payment_intent.succeeded）でmetadata.reservation_id照合により確定する
     await supabaseAdmin.from("payments").insert({
       store_id,
       customer_id: null, // Webhook完了後に更新
@@ -122,7 +132,8 @@ export async function POST(request: NextRequest) {
       status: "pending",
       amount: reservation.total_amount,
       platform_fee: fee,
-      stripe_payment_intent_id: session.payment_intent as string,
+      stripe_payment_intent_id:
+        typeof session.payment_intent === "string" ? session.payment_intent : null,
       metadata: { reservation_id: reservation.id, session_id: session.id },
     });
 

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import {
   verifyWebhookSignature,
   markEventAsProcessed,
+  unmarkEventAsProcessed,
   handlePaymentIntentSucceeded,
   handleCustomerSubscriptionCreated,
   handleCustomerSubscriptionUpdated,
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
             .eq("store_id", expired.metadata.store_id)
             .eq("status", "pending");
         }
+        // 決済されなかった予約は即キャンセルして枠を解放する
+        if (expired.metadata?.type === "reservation" && expired.metadata?.reservation_id) {
+          await supabaseAdmin
+            .from("reservations")
+            .update({ status: "cancelled" })
+            .eq("id", expired.metadata.reservation_id)
+            .eq("store_id", expired.metadata.store_id)
+            .eq("status", "pending");
+        }
         break;
       }
       default:
@@ -81,6 +91,8 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error(`Error processing connect event ${event.type}:`, err);
+    // 処理済みマークを外し、Stripeの再送で再処理できるようにする
+    await unmarkEventAsProcessed(uniqueEventId);
     return Response.json({ error: "Processing failed" }, { status: 500 });
   }
 

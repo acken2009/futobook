@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import {
   verifyWebhookSignature,
   markEventAsProcessed,
+  unmarkEventAsProcessed,
   handlePlatformInvoicePaid,
   handlePlatformInvoicePaymentFailed,
   handleAccountUpdated,
@@ -58,6 +59,8 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error(`Error processing platform event ${event.type}:`, err);
+    // 処理済みマークを外し、Stripeの再送で再処理できるようにする
+    await unmarkEventAsProcessed(event.id);
     return Response.json({ error: "Processing failed" }, { status: 500 });
   }
 

@@ -4,7 +4,7 @@ import { stripe } from "@/lib/stripe/client";
 import { apiError } from "@/lib/utils";
 import { sendEmail } from "@/lib/email/send";
 import { sendLineMessage } from "@/lib/line/send";
-import { reservationCancellationEmail } from "@/lib/email/templates";
+import { escapeHtml, reservationCancellationEmail } from "@/lib/email/templates";
 import { calcRefundAmount } from "@/lib/stripe/refund";
 import { z } from "zod";
 
@@ -74,9 +74,6 @@ export async function POST(request: NextRequest) {
     if (refundAmount > 0) {
       // Connect アカウント上のPaymentIntentを返金するため stripeAccount が必要
       const stripeAccountId = (reservation.stores as any)?.stripe_account_id;
-      const refundOptions = stripeAccountId
-        ? { stripeAccount: stripeAccountId }
-        : undefined;
 
       try {
         await stripe.refunds.create(
@@ -84,7 +81,11 @@ export async function POST(request: NextRequest) {
             payment_intent: payment.stripe_payment_intent_id,
             amount: refundAmount,
           },
-          refundOptions
+          {
+            ...(stripeAccountId ? { stripeAccount: stripeAccountId } : {}),
+            // 同時リクエストやリトライで同一予約に二重返金しない
+            idempotencyKey: `cancel_refund_${reservation.id}`,
+          }
         );
         await supabaseAdmin
           .from("payments")
@@ -98,12 +99,18 @@ export async function POST(request: NextRequest) {
   }
 
   // 返金成功（または返金不要）後にキャンセル実行
-  const { error } = await supabaseAdmin
+  // 条件付き更新: 同時リクエストで両方が通っても通知が二重に飛ばないようにする
+  const { data: cancelled, error } = await supabaseAdmin
     .from("reservations")
     .update({ status: "cancelled" })
-    .eq("id", reservation.id);
+    .eq("id", reservation.id)
+    .neq("status", "cancelled")
+    .select("id");
 
   if (error) return apiError("キャンセルに失敗しました", 500);
+  if (!cancelled || cancelled.length === 0) {
+    return apiError("すでにキャンセル済みです", 400);
+  }
 
   const customer = reservation.customers as unknown as { name: string; email: string } | null;
   const service = reservation.service_items as unknown as { name: string } | null;
@@ -168,7 +175,7 @@ export async function POST(request: NextRequest) {
       await sendEmail({
         to: ownerUser.user.email,
         subject: `【キャンセル通知】${store.name} - ${date} ${customer?.name ?? ""}様`,
-        html: `<p>${customer?.name ?? "お客様"}が ${date} の予約をキャンセルしました。</p>`,
+        html: `<p>${escapeHtml(customer?.name) || "お客様"}が ${date} の予約をキャンセルしました。</p>`,
         storeId: store.id,
         type: "reservation_cancellation",
       });
