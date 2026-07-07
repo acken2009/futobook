@@ -94,6 +94,15 @@ Run the SQL directly in Supabase Dashboard → SQL Editor.
 
 `middleware.ts` rewrites `{slug}.{APP_DOMAIN}` → `/store/{slug}`. Disabled for `localhost:3000`. Store slug is injected as `x-store-slug` response header.
 
+### Platform Plans & Feature Fences
+
+Pricing (as of 2026-07): スターター ¥0 (30 reservations/mo, 4.9% fee) / ベーシック ¥2,980 (unlimited, 2.9%) / スタンダード ¥9,800 (unlimited, 1.9%). Yearly billing = monthly × 10 (2 months free); the yearly Stripe Price lives on the same Product and is looked up by interval at checkout (no schema change).
+
+- Plan definitions: `app/api/admin/init-plans/route.ts` (idempotent upsert; safe to re-run)
+- Feature gating: `lib/plans/features.ts` — `getStoreFeatures(storeId)` / `checkFeature()`. Free tier: no LINE notifications, no product sales, no branding customization, no analytics, "Powered by futobook" footer shown. customerSubscriptions (月額会員) is standard-only.
+- Gates are enforced server-side in API routes; dashboard pages show `components/upgrade-notice.tsx`
+- `store-customizations` POST silently strips branding fields (colors/logo/cover) for free tier so basic info (address, phone) stays editable
+
 ### Rate Limiting
 
 `lib/rate-limit.ts` — in-memory (per-process) rate limiter. Two presets: `reservationRateLimit` (10 req/10min per IP) and `checkoutRateLimit` (5 req/1min per IP).

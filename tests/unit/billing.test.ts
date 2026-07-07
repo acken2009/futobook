@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calculatePlatformFee, calculateSubscriptionFeePercent } from "@/lib/stripe/fees";
+import { tierFromPlan, PLAN_FEATURES } from "@/lib/plans/features";
 
 // プランデータ（実際のDBと同じ構造）
 const PLANS = [
@@ -7,21 +8,21 @@ const PLANS = [
     id: "starter-id",
     name: "スターター",
     price: 0,
-    transaction_fee_pct: 0.05,
-    max_reservations_per_month: 20,
+    transaction_fee_pct: 0.049,
+    max_reservations_per_month: 30,
   },
   {
     id: "basic-id",
     name: "ベーシック",
     price: 2980,
-    transaction_fee_pct: 0.03,
+    transaction_fee_pct: 0.029,
     max_reservations_per_month: null,
   },
   {
     id: "standard-id",
     name: "スタンダード",
     price: 9800,
-    transaction_fee_pct: 0.02,
+    transaction_fee_pct: 0.019,
     max_reservations_per_month: null,
   },
 ];
@@ -187,9 +188,9 @@ describe("サブスク手数料率変換（calculateSubscriptionFeePercent）", 
 });
 
 describe("プランの制限チェック", () => {
-  it("スタータープランは月20件制限がある", () => {
+  it("スタータープランは月30件制限がある", () => {
     const starter = PLANS.find((p) => p.name === "スターター");
-    expect(starter?.max_reservations_per_month).toBe(20);
+    expect(starter?.max_reservations_per_month).toBe(30);
   });
 
   it("ベーシックプランは予約件数無制限", () => {
@@ -205,5 +206,96 @@ describe("プランの制限チェック", () => {
   it("プランは価格順に並んでいる", () => {
     const prices = PLANS.map((p) => p.price);
     expect(prices).toEqual([0, 2980, 9800]);
+  });
+});
+
+describe("新料金の手数料計算（4.9 / 2.9 / 1.9%）", () => {
+  it("スターター: 10000円の4.9%は490円", () => {
+    expect(calcPlatformFee(10000, 0.049)).toBe(490);
+  });
+
+  it("ベーシック: 10000円の2.9%は290円", () => {
+    expect(calcPlatformFee(10000, 0.029)).toBe(290);
+  });
+
+  it("スタンダード: 10000円の1.9%は190円", () => {
+    expect(calcPlatformFee(10000, 0.019)).toBe(190);
+  });
+
+  it("サブスク手数料率: 0.049 → 4.9（浮動小数点誤差なし）", () => {
+    expect(calculateSubscriptionFeePercent(0.049)).toBe(4.9);
+  });
+
+  it("サブスク手数料率: 0.029 → 2.9", () => {
+    expect(calculateSubscriptionFeePercent(0.029)).toBe(2.9);
+  });
+
+  it("サブスク手数料率: 0.019 → 1.9", () => {
+    expect(calculateSubscriptionFeePercent(0.019)).toBe(1.9);
+  });
+});
+
+describe("プラン階層判定（tierFromPlan）", () => {
+  it("プラン未加入（null）は free", () => {
+    expect(tierFromPlan(null)).toBe("free");
+    expect(tierFromPlan(undefined)).toBe("free");
+  });
+
+  it("price=0（スターター）は free", () => {
+    expect(tierFromPlan({ name: "スターター", price: 0 })).toBe("free");
+  });
+
+  it("ベーシック（¥2,980）は basic", () => {
+    expect(tierFromPlan({ name: "ベーシック", price: 2980 })).toBe("basic");
+  });
+
+  it("スタンダード（¥9,800）は standard", () => {
+    expect(tierFromPlan({ name: "スタンダード", price: 9800 })).toBe("standard");
+  });
+
+  it("名前に「スタンダード」を含めば価格に関わらず standard", () => {
+    expect(tierFromPlan({ name: "スタンダード（旧）", price: 5000 })).toBe("standard");
+  });
+
+  it("¥9,800以上の有料プランは名前が違っても standard", () => {
+    expect(tierFromPlan({ name: "プロ", price: 29800 })).toBe("standard");
+  });
+});
+
+describe("プラン機能フェンス定義", () => {
+  it("free は LINE・物販・サブスク・カスタマイズ・分析が使えない", () => {
+    const f = PLAN_FEATURES.free;
+    expect(f.lineNotifications).toBe(false);
+    expect(f.productSales).toBe(false);
+    expect(f.customerSubscriptions).toBe(false);
+    expect(f.customization).toBe(false);
+    expect(f.analytics).toBe(false);
+    expect(f.hideBranding).toBe(false);
+  });
+
+  it("basic は サブスク以外の全機能が使える", () => {
+    const f = PLAN_FEATURES.basic;
+    expect(f.lineNotifications).toBe(true);
+    expect(f.productSales).toBe(true);
+    expect(f.customerSubscriptions).toBe(false);
+    expect(f.customization).toBe(true);
+    expect(f.analytics).toBe(true);
+    expect(f.hideBranding).toBe(true);
+  });
+
+  it("standard は全機能が使える", () => {
+    const f = PLAN_FEATURES.standard;
+    expect(Object.values(f).every(Boolean)).toBe(true);
+  });
+
+  it("上位プランは下位プランの機能をすべて含む（単調性）", () => {
+    const tiers = [PLAN_FEATURES.free, PLAN_FEATURES.basic, PLAN_FEATURES.standard];
+    for (let i = 1; i < tiers.length; i++) {
+      for (const key of Object.keys(tiers[i - 1]) as (keyof typeof PLAN_FEATURES.free)[]) {
+        if (tiers[i - 1][key]) {
+          expect(tiers[i][key]).toBe(true);
+        }
+      }
+    }
   });
 });

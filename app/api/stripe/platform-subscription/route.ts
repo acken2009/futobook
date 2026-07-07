@@ -7,6 +7,8 @@ import { z } from "zod";
 
 const Schema = z.object({
   plan_id: z.string().uuid(),
+  // 課金間隔（year = 年払い・2ヶ月分無料）
+  interval: z.enum(["month", "year"]).default("month"),
 });
 
 /**
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
   const result = Schema.safeParse(body);
   if (!result.success) return apiError(result.error.errors[0].message, 400);
 
-  const { plan_id } = result.data;
+  const { plan_id, interval } = result.data;
 
   const { data: store } = await supabaseAdmin
     .from("stores")
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   const { data: plan } = await supabaseAdmin
     .from("platform_subscription_plans")
-    .select("id, name, price, stripe_price_id")
+    .select("id, name, price, stripe_price_id, stripe_product_id")
     .eq("id", plan_id)
     .eq("is_active", true)
     .single();
@@ -76,6 +78,26 @@ export async function POST(request: NextRequest) {
     return apiError("Stripe Price IDが設定されていません。管理者にお問い合わせください。", 400);
   }
 
+  // 年払いの場合は同一Product配下の年額Price（月額×10 = 2ヶ月分無料）を使う
+  let checkoutPriceId = plan.stripe_price_id;
+  if (interval === "year") {
+    if (!plan.stripe_product_id || plan.stripe_product_id === "prod_free") {
+      return apiError("年払いは現在このプランではご利用いただけません", 400);
+    }
+    const prices = await stripe.prices.list({
+      product: plan.stripe_product_id,
+      active: true,
+      limit: 100,
+    });
+    const yearly = prices.data.find(
+      (p) => p.recurring?.interval === "year" && p.unit_amount === plan.price * 10
+    );
+    if (!yearly) {
+      return apiError("年払い価格が未設定です。管理者にお問い合わせください。", 400);
+    }
+    checkoutPriceId = yearly.id;
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
   let stripeCustomerId: string;
@@ -94,7 +116,7 @@ export async function POST(request: NextRequest) {
     mode: "subscription",
     customer: stripeCustomerId,
     payment_method_types: ["card"],
-    line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
+    line_items: [{ price: checkoutPriceId, quantity: 1 }],
     subscription_data: {
       metadata: {
         store_id: store.id,
