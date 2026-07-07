@@ -24,7 +24,7 @@ export interface SubscriptionEmailData {
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com";
 
-function escapeHtml(str: string | undefined | null): string {
+export function escapeHtml(str: string | undefined | null): string {
   if (!str) return "";
   return str
     .replace(/&/g, "&amp;")
@@ -157,7 +157,6 @@ export function reservationNotificationEmail(data: ReservationNotificationData):
     minute: "2-digit",
   });
 
-  const eStore = escapeHtml(data.storeName);
   const eService = escapeHtml(data.serviceName);
   const safeDashboardUrl = safeUrl(data.dashboardUrl);
 

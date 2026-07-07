@@ -172,13 +172,17 @@ describe("サブスク手数料率変換（calculateSubscriptionFeePercent）", 
     expect(calculateSubscriptionFeePercent(0.10)).toBe(10);
   });
 
-  it("浮動小数点誤差: 0.03 * 100 = 3.0000000000000004 → Math.roundで3になる", () => {
+  it("浮動小数点誤差: 0.03 * 100 = 3.0000000000000004 → 丸めて3になる", () => {
     // JavaScript の浮動小数点: 0.03 * 100 !== 3 の場合がある
     expect(calculateSubscriptionFeePercent(0.03)).toBe(3);
   });
 
-  it("2.5% → 3（Math.round: 0.5は切り上げ）", () => {
-    expect(calculateSubscriptionFeePercent(0.025)).toBe(3);
+  it("2.5% → 2.5（Stripeは小数2桁まで対応するため丸めない）", () => {
+    expect(calculateSubscriptionFeePercent(0.025)).toBe(2.5);
+  });
+
+  it("小数3桁以下は2桁に丸める: 2.567% → 2.57", () => {
+    expect(calculateSubscriptionFeePercent(0.02567)).toBe(2.57);
   });
 });
 
