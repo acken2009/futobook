@@ -1,7 +1,13 @@
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// 遅延初期化: 環境変数が無い環境（CIのビルド等）でも import 自体は失敗しない
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
+
 const FROM = process.env.EMAIL_FROM ?? "noreply@storeplatform.jp";
 
 interface SendEmailOptions {
@@ -19,7 +25,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const { to, subject, html, storeId, type = "general" } = options;
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM,
       to,
       subject,

@@ -4,11 +4,17 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com";
 
-  // 公開店舗一覧を取得
-  const { data: stores } = await supabaseAdmin
-    .from("stores")
-    .select("slug, updated_at")
-    .eq("status", "active");
+  // 公開店舗一覧を取得（DBに接続できないビルド環境でも静的URLは返す）
+  let stores: { slug: string; updated_at: string }[] | null = null;
+  try {
+    const { data } = await supabaseAdmin
+      .from("stores")
+      .select("slug, updated_at")
+      .eq("status", "active");
+    stores = data;
+  } catch (e) {
+    console.warn("sitemap: failed to fetch stores", e);
+  }
 
   const storeUrls: MetadataRoute.Sitemap = (stores ?? []).flatMap((store) => [
     {
