@@ -35,9 +35,9 @@ export default async function CustomizationPage() {
 
   return (
     <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">店舗カスタマイズ</h1>
+      <h1 className="text-2xl font-bold mb-2">店舗情報</h1>
       <p className="text-gray-500 mb-8">
-        店舗ページの外観を自由にカスタマイズできます。
+        店舗の説明・連絡先・SNS・写真を登録します。ここで登録した内容はサイトの各セクションに自動で表示されます。
       </p>
       {!features.customization && (
         <UpgradeNotice

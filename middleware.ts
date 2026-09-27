@@ -116,7 +116,8 @@ export async function middleware(request: NextRequest) {
   // セキュリティヘッダー
   // ============================================================
   supabaseResponse.headers.set("X-Content-Type-Options", "nosniff");
-  supabaseResponse.headers.set("X-Frame-Options", "DENY");
+  // サイト作成画面のプレビュー（同一オリジンの iframe）だけは埋め込みを許可する
+  supabaseResponse.headers.set("X-Frame-Options", pathname.startsWith("/site-preview") ? "SAMEORIGIN" : "DENY");
   supabaseResponse.headers.set("X-XSS-Protection", "1; mode=block");
   supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   supabaseResponse.headers.set(

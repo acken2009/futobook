@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  const type = (formData.get("type") as string) ?? "gallery"; // logo | cover | gallery
+  // logo | cover | gallery | section（サイトのセクション内画像: URLを返すだけでDBには登録しない）
+  const type = (formData.get("type") as string) ?? "gallery";
+  if (!["logo", "cover", "gallery", "section"].includes(type)) return apiError("不正な画像種別です", 400);
 
   if (!file) return apiError("ファイルが必要です", 400);
   if (file.size > MAX_FILE_SIZE) return apiError("5MB以下のファイルを選択してください", 400);
@@ -80,6 +82,8 @@ export async function POST(request: NextRequest) {
   if (uploadError) return apiError(uploadError.message, 500);
 
   const { data: { publicUrl } } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
+
+  if (type === "section") return Response.json({ url: publicUrl });
 
   // logo/cover はstore_customizationsを更新
   if (type === "logo" || type === "cover") {

@@ -28,7 +28,8 @@ export default async function DashboardLayout({
   const navItems = lang === "en"
     ? [
         { href: "/dashboard", label: "Dashboard", icon: "📊" },
-        { href: "/dashboard/customization", label: "Customization", icon: "🎨" },
+        { href: "/dashboard/site", label: "Website Builder", icon: "🎨" },
+        { href: "/dashboard/customization", label: "Store Info", icon: "🏪" },
         { href: "/dashboard/services", label: "Services", icon: "🛠️" },
         { href: "/dashboard/availability", label: "Hours & Slots", icon: "📅" },
         { href: "/dashboard/reservations", label: "Reservations", icon: "📋" },
@@ -41,7 +42,8 @@ export default async function DashboardLayout({
       ]
     : [
         { href: "/dashboard", label: "ダッシュボード", icon: "📊" },
-        { href: "/dashboard/customization", label: "店舗カスタマイズ", icon: "🎨" },
+        { href: "/dashboard/site", label: "サイト作成", icon: "🎨" },
+        { href: "/dashboard/customization", label: "店舗情報", icon: "🏪" },
         { href: "/dashboard/services", label: "サービスメニュー", icon: "🛠️" },
         { href: "/dashboard/availability", label: "営業時間・枠設定", icon: "📅" },
         { href: "/dashboard/reservations", label: "予約管理", icon: "📋" },

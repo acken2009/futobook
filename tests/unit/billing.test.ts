@@ -263,12 +263,12 @@ describe("プラン階層判定（tierFromPlan）", () => {
 });
 
 describe("プラン機能フェンス定義", () => {
-  it("free は LINE・物販・サブスク・カスタマイズ・分析が使えない", () => {
+  it("free は LINE・物販・サブスク・分析が使えない（サイトカスタマイズは全プラン開放）", () => {
     const f = PLAN_FEATURES.free;
     expect(f.lineNotifications).toBe(false);
     expect(f.productSales).toBe(false);
     expect(f.customerSubscriptions).toBe(false);
-    expect(f.customization).toBe(false);
+    expect(f.customization).toBe(true);
     expect(f.analytics).toBe(false);
     expect(f.hideBranding).toBe(false);
   });

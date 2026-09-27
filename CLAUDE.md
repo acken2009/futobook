@@ -99,9 +99,21 @@ Run the SQL directly in Supabase Dashboard → SQL Editor.
 Pricing (as of 2026-07): スターター ¥0 (30 reservations/mo, 4.9% fee) / ベーシック ¥2,980 (unlimited, 2.9%) / スタンダード ¥9,800 (unlimited, 1.9%). Yearly billing = monthly × 10 (2 months free); the yearly Stripe Price lives on the same Product and is looked up by interval at checkout (no schema change).
 
 - Plan definitions: `app/api/admin/init-plans/route.ts` (idempotent upsert; safe to re-run)
-- Feature gating: `lib/plans/features.ts` — `getStoreFeatures(storeId)` / `checkFeature()`. Free tier: no LINE notifications, no product sales, no branding customization, no analytics, "Powered by futobook" footer shown. customerSubscriptions (月額会員) is standard-only.
+- Feature gating: `lib/plans/features.ts` — `getStoreFeatures(storeId)` / `checkFeature()`. Free tier: no LINE notifications, no product sales, no analytics, "Powered by futobook" footer shown. customerSubscriptions (月額会員) is standard-only.
+- Site customization (templates, colors, logo/cover/gallery) is open to **all plans** since 2026-09 (`customization: true` for free); the free-tier strip logic in `store-customizations` POST is kept but is currently a no-op
 - Gates are enforced server-side in API routes; dashboard pages show `components/upgrade-notice.tsx`
-- `store-customizations` POST silently strips branding fields (colors/logo/cover) for free tier so basic info (address, phone) stays editable
+
+### Store Site Builder (業種別テンプレート + セクション編集)
+
+The public store page `/store/[slug]` is rendered from a per-store `SiteConfig` stored in `store_customizations.site_config` (JSONB, migration `0010`). NULL = the "simple" template, which reproduces the pre-builder layout.
+
+- `lib/site/sections.ts` — section types (hero, concept, coupon, menu, staff, gallery, plans, voices, news, faq, hours, access, cta, sns) and their **field definitions**. The editor form and the zod validation schema are both generated from these definitions — add/change a field here only
+- `lib/site/config.ts` — `SiteConfig` type, `siteConfigSchema` (strict; used by `PUT /api/site-config`), `normalizeSiteConfig` (lenient; drops only broken sections so the public page always renders), theme palettes/contrast helpers
+- `lib/site/templates.ts` — industry templates (currently 美容室・理容室 ×4 + 汎用). To add an industry: add a `TEMPLATE_CATEGORIES` entry and templates. `applyTemplate` keeps store-entered content when switching templates. Template sample copy must be generic — store-specific facts (coupons, staff, FAQ answers) start empty; empty sections are auto-hidden on the public page
+- `components/site/site-renderer.tsx` — shared renderer (no hooks/server-only imports) used by the public page and the editor preview. Colors are CSS variables (`--c-*`); user text is rendered as React text only
+- Menu/gallery/hours/access/SNS sections read existing data (service_items, store_images, availability_schedules, store_customizations) — no duplication in `site_config`
+- Editor: `/dashboard/site` (`site-editor.tsx`) with a live preview iframe at `/site-preview` (auth-gated, receives unsaved drafts via same-origin `postMessage`, see `lib/site/preview-protocol.ts`). `middleware.ts` sends `X-Frame-Options: SAMEORIGIN` for `/site-preview` only
+- Section images upload via `POST /api/store-images` with `type=section` (returns URL, no DB row)
 
 ### Rate Limiting
 

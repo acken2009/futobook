@@ -29,7 +29,8 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     lineNotifications: false,
     productSales: false,
     customerSubscriptions: false,
-    customization: false,
+    // サイトビルダー（テンプレート・色・ロゴ・ギャラリー）は集客重視で全プラン開放（2026-09）
+    customization: true,
     analytics: false,
     hideBranding: false,
   },

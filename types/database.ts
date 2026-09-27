@@ -78,6 +78,8 @@ export interface StoreCustomization {
   website_url: string | null;
   instagram_url: string | null;
   twitter_url: string | null;
+  /** 店舗サイト設定（lib/site/config.ts の SiteConfig）。NULL = シンプルテンプレート */
+  site_config?: unknown | null;
   created_at: string;
   updated_at: string;
 }
