@@ -49,19 +49,42 @@ function buildUpstashLimiter(requests: number, window: string): AsyncLimiter {
 
   return async (key: string): Promise<RateLimitResult> => {
     if (!limiterPromise) {
-      const { Ratelimit } = await import("@upstash/ratelimit");
-      const { Redis } = await import("@upstash/redis");
-      const instance = new Ratelimit({
-        redis: Redis.fromEnv(),
-        limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"ms" | "s" | "m" | "h" | "d"}`),
-        analytics: false,
-      });
-      limiterPromise = Promise.resolve(instance);
+      limiterPromise = (async () => {
+        const { Ratelimit } = await import("@upstash/ratelimit");
+        const { Redis } = await import("@upstash/redis");
+        return new Ratelimit({
+          redis: Redis.fromEnv(),
+          limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"ms" | "s" | "m" | "h" | "d"}`),
+          analytics: false,
+        });
+      })();
+      // 初期化に失敗したら次回のリクエストで作り直す
+      limiterPromise.catch(() => { limiterPromise = null; });
     }
     const instance = await limiterPromise;
     const { success, remaining, reset } = await instance.limit(key);
     return { success, remaining, resetAt: reset };
   };
+}
+
+/**
+ * Upstash の障害（DB停止・認証エラー・タイムアウト等）で予約や決済そのものを
+ * 止めないよう、失敗時はインメモリ実装にフォールバックする（fail-open）。
+ */
+async function limitWithFallback(
+  limiter: AsyncLimiter | null,
+  key: string,
+  windowMs: number,
+  max: number
+): Promise<RateLimitResult> {
+  if (limiter) {
+    try {
+      return await limiter(key);
+    } catch (err) {
+      console.error("[rate-limit] Upstash に接続できないためインメモリにフォールバックします:", err);
+    }
+  }
+  return memoryLimit(key, windowMs, max);
 }
 
 const useRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
@@ -73,18 +96,15 @@ const upstashAuth        = useRedis ? buildUpstashLimiter(5,  "15 m") : null;
 // ── 公開 API ─────────────────────────────────────────────────────────────────
 
 export async function reservationRateLimit(ip: string): Promise<RateLimitResult> {
-  if (upstashReservation) return upstashReservation(`reservation:${ip}`);
-  return memoryLimit(`reservation:${ip}`, 10 * 60_000, 10);
+  return limitWithFallback(upstashReservation, `reservation:${ip}`, 10 * 60_000, 10);
 }
 
 export async function checkoutRateLimit(ip: string): Promise<RateLimitResult> {
-  if (upstashCheckout) return upstashCheckout(`checkout:${ip}`);
-  return memoryLimit(`checkout:${ip}`, 60_000, 5);
+  return limitWithFallback(upstashCheckout, `checkout:${ip}`, 60_000, 5);
 }
 
 export async function authRateLimit(identifier: string): Promise<RateLimitResult> {
-  if (upstashAuth) return upstashAuth(`auth:${identifier}`);
-  return memoryLimit(`auth:${identifier}`, 15 * 60_000, 5);
+  return limitWithFallback(upstashAuth, `auth:${identifier}`, 15 * 60_000, 5);
 }
 
 export function rateLimitResponse(resetAt: number): Response {
