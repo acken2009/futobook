@@ -557,7 +557,8 @@ function SectionView({ section, data, t, reserveHref }: { section: SiteSection; 
 
 function Hero({ section, data, t, reserveHref }: { section: SiteSection; data: SiteData; t: Labels; reserveHref: string }) {
   const p = section.props;
-  const sub = p.subcopy?.trim() || data.description;
+  // サブコピーは日本語のみの入力欄なので、英語ページでは店舗説明（英語）を優先する
+  const sub = data.isEn ? data.description || p.subcopy?.trim() : p.subcopy?.trim() || data.description;
   const image = data.coverUrl ?? data.images[0]?.url ?? null;
 
   const buttons = (inverse: boolean) => (

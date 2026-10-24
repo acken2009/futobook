@@ -5,6 +5,7 @@
  * 新しい業種を増やすときは TEMPLATE_CATEGORIES と SITE_TEMPLATES に追加するだけでよい。
  *
  * 初期文言は「どの店舗が公開しても事実と食い違わない」汎用的なものに限る。
+ * ヒーローのサブコピーは入れない（空欄なら「店舗情報」の店舗説明が表示されるため、店舗自身の説明を優先する）。
  * クーポン・スタッフ・FAQ など店舗固有の情報は空のまま（空のセクションは公開ページで自動的に非表示）。
  */
 import { createSection, type SiteConfig, type SiteSection, type SiteTheme } from "./config";
@@ -37,7 +38,7 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
     colors: { primary: "#8B6B4A", secondary: "#C9A97E" },
     theme: { tone: "cream", font: "mincho", radius: "rounded" },
     sections: [
-      ["hero", { variant: "split", catchcopy: "髪から、毎日を心地よく。", subcopy: "一人ひとりの髪質とライフスタイルに寄り添い、扱いやすく長持ちするスタイルをご提案します。" }],
+      ["hero", { variant: "split", catchcopy: "髪から、毎日を心地よく。" }],
       ["concept", { body: "カウンセリングを大切に、お客様のなりたいイメージを丁寧に伺います。ご自宅でも再現しやすいスタイルづくりを心がけています。", imagePosition: "left" }],
       ["coupon"],
       ["menu", { variant: "list", note: "表示価格はすべて税込です。" }],
@@ -59,7 +60,7 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
     colors: { primary: "#B08D57", secondary: "#1A1A1A" },
     theme: { tone: "dark", font: "modern", radius: "square" },
     sections: [
-      ["hero", { variant: "cover", catchcopy: "似合うを、更新する。", subcopy: "トレンドと骨格・髪質を掛け合わせた、あなただけのデザインを。" }],
+      ["hero", { variant: "cover", catchcopy: "似合うを、更新する。" }],
       ["gallery", { columns: "4" }],
       ["concept", { imagePosition: "right" }],
       ["menu", { variant: "cards", note: "表示価格はすべて税込です。" }],
@@ -80,7 +81,7 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
     colors: { primary: "#8B1E2D", secondary: "#C9A227" },
     theme: { tone: "dark", font: "mincho", radius: "square" },
     sections: [
-      ["hero", { variant: "cover", catchcopy: "確かな技術で、男を上げる。", subcopy: "カット・シェービング・ヘッドスパ。くつろぎの時間とともに。" }],
+      ["hero", { variant: "cover", catchcopy: "確かな技術で、男を上げる。" }],
       ["concept", { body: "伝統的な理容の技術と、今の時代に合うスタイルを。一人ひとりの骨格と髪質を見極め、手入れのしやすい仕上がりをお約束します。", imagePosition: "left" }],
       ["menu", { variant: "list", note: "表示価格はすべて税込です。" }],
       ["staff"],
@@ -101,7 +102,7 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
     colors: { primary: "#E0748A", secondary: "#7EC8C8" },
     theme: { tone: "light", font: "rounded", radius: "pill" },
     sections: [
-      ["hero", { variant: "split", catchcopy: "家族みんなで通える、まちの美容室。", subcopy: "お子さまからご年配の方まで、気軽にお越しください。" }],
+      ["hero", { variant: "split", catchcopy: "家族みんなで通える、まちの美容室。" }],
       ["news"],
       ["concept", { imagePosition: "right" }],
       ["coupon"],

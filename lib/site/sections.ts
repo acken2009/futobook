@@ -78,7 +78,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
         ],
       },
       { key: "catchcopy", label: "キャッチコピー", kind: "text", max: 60, placeholder: "例: 髪から、毎日を心地よく。" },
-      { key: "subcopy", label: "サブコピー", kind: "textarea", max: 200 },
+      { key: "subcopy", label: "サブコピー（空欄なら「店舗情報」の店舗説明を表示）", kind: "textarea", max: 200 },
     ],
     defaultProps: { variant: "cover", catchcopy: "", subcopy: "" },
   },

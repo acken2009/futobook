@@ -24,6 +24,13 @@ describe("テンプレート定義", () => {
     }
   });
 
+  it("ヒーローのサブコピーは空（店舗情報の店舗説明を優先して表示するため）", () => {
+    for (const t of SITE_TEMPLATES) {
+      const hero = buildConfigFromTemplate(t).sections.find((s) => s.type === "hero");
+      expect(hero?.props.subcopy ?? "", t.id).toBe("");
+    }
+  });
+
   it("テンプレートIDが重複していない", () => {
     const ids = SITE_TEMPLATES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
