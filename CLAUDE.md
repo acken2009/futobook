@@ -117,7 +117,7 @@ The public store page `/store/[slug]` is rendered from a per-store `SiteConfig` 
 
 ### Rate Limiting
 
-`lib/rate-limit.ts` — Upstash Redis sliding window when `UPSTASH_REDIS_REST_URL`/`TOKEN` are set (production), otherwise in-memory (per-process). Presets: `reservationRateLimit` (10 req/10min per IP), `checkoutRateLimit` (5 req/1min per IP), `authRateLimit`.
+`lib/rate-limit.ts` — Upstash Redis sliding window when `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Vercel Marketplace "Upstash for Redis" resource `futobook-ratelimit`, hnd1, created 2026-10) or legacy `UPSTASH_REDIS_REST_URL`/`TOKEN` are set (production), otherwise in-memory (per-process). Presets: `reservationRateLimit` (10 req/10min per IP), `checkoutRateLimit` (5 req/1min per IP), `authRateLimit`.
 - **Fail-open**: if Upstash throws (DB archived/deleted, bad token, network), it logs `[rate-limit]` and falls back to the in-memory limiter. Before 2026-10 an Upstash outage made `/api/reservations` and both checkout routes return 500 before any validation — if you see `[rate-limit]` errors in Vercel logs, fix the Upstash env vars rather than removing the fallback
 
 ### Cron Jobs (Hobby plan constraint)

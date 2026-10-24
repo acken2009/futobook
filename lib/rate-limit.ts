@@ -1,6 +1,6 @@
 /**
  * レートリミッター
- * - 本番環境（UPSTASH_REDIS_REST_URL 設定時）: Upstash Redis + Sliding Window
+ * - 本番環境（KV_REST_API_URL または UPSTASH_REDIS_REST_URL 設定時）: Upstash Redis + Sliding Window
  * - 開発環境（未設定時）: インメモリ Map（単一プロセス用フォールバック）
  */
 
@@ -53,7 +53,7 @@ function buildUpstashLimiter(requests: number, window: string): AsyncLimiter {
         const { Ratelimit } = await import("@upstash/ratelimit");
         const { Redis } = await import("@upstash/redis");
         return new Ratelimit({
-          redis: Redis.fromEnv(),
+          redis: new Redis({ url: redisEnv!.url, token: redisEnv!.token }),
           limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"ms" | "s" | "m" | "h" | "d"}`),
           analytics: false,
         });
@@ -87,7 +87,13 @@ async function limitWithFallback(
   return memoryLimit(key, windowMs, max);
 }
 
-const useRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+// Vercel Marketplace の Upstash は KV_REST_API_*、手動設定は UPSTASH_REDIS_REST_* の名前で入る
+const redisEnv = (() => {
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url, token } : null;
+})();
+const useRedis = redisEnv !== null;
 
 const upstashReservation = useRedis ? buildUpstashLimiter(10, "10 m") : null;
 const upstashCheckout    = useRedis ? buildUpstashLimiter(5,  "1 m")  : null;

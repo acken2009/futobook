@@ -9,7 +9,7 @@ vi.mock("@upstash/ratelimit", () => {
   }
   return { Ratelimit };
 });
-vi.mock("@upstash/redis", () => ({ Redis: { fromEnv: () => ({}) } }));
+vi.mock("@upstash/redis", () => ({ Redis: class {} }));
 
 describe("rate-limit（Upstash 障害時のフォールバック）", () => {
   beforeEach(() => {
